@@ -21,3 +21,13 @@ assert.equal(motion.cameraDistance([0,1,0],[0,1,0],[]),0);
 assert.ok(Math.abs(motion.walkBob(1,6,true,true).y)>0);
 for(const [speed,grounded,enabled] of [[0,true,true],[6,false,true],[6,true,false]])assert.equal(motion.walkBob(1,speed,grounded,enabled).y,0);
 console.log('PASS: opaque-wall camera clearance, furniture heights, ceilings, and grounded-only optional walk bob.');
+
+// Broad-phase collision candidates must never omit a collider touching the player.
+{
+ const source=require('node:fs').readFileSync('src/world.js','utf8'),start=source.indexOf('const colliderGrid='),end=source.indexOf('const ov=',start),context={COL:[],colliderRevision:0,PR:.4};
+ const vm=require('node:vm');vm.createContext(context);vm.runInContext(source.slice(start,end)+';this.query=nearColliders',context);
+ for(let i=0;i<180;i++){const x=(i*37%241)-120,z=(i*71%241)-120;context.COL.push({f:i%3+1,x0:x,x1:x+1+i%12,z0:z,z1:z+1+i%9,on:i%4!==0})}context.colliderRevision++;
+ for(let f=1;f<=3;f++)for(let x=-120;x<=120;x+=3.7)for(let z=-120;z<=120;z+=5.3){const candidates=context.query(x,z,f);for(const c of context.COL)if(c.f===f&&x>c.x0-.4&&x<c.x1+.4&&z>c.z0-.4&&z<c.z1+.4)assert.ok(candidates.includes(c))}
+ const replacement={f:1,x0:-1,x1:1,z0:-1,z1:1,on:true};context.COL.splice(0,1,replacement);context.colliderRevision++;assert.ok(context.query(0,0,1).includes(replacement));context.COL.splice(0,1);assert.ok(!context.query(0,0,1).includes(replacement));
+ console.log('PASS: spatial collision grid covers all overlapping boxes, floor boundaries, insertions and removals.');
+}

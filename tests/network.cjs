@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const {Retry,Seen}=vm.runInNewContext(fs.readFileSync('src/network.js','utf8')+';CC_NETWORK');
+const retry=new Retry(2000,60000);
+assert.equal(retry.ready('peer',0),true);
+assert.equal(retry.fail('peer',100,.5),2000);
+assert.equal(retry.ready('peer',2099),false);
+assert.equal(retry.ready('peer',2100),true);
+assert.equal(retry.fail('peer',2100,.5),4000);
+for(let i=0;i<12;i++)assert.ok(retry.fail('peer',10000,.5)<=60000);
+assert.ok(retry.fail('peer',10000,1)<=60000);
+retry.clear('peer');assert.equal(retry.ready('peer',0),true);
+const seen=new Seen(2,5000);
+assert.equal(seen.accept('alice|1',0),true);assert.equal(seen.accept('alice|1',1),false);
+assert.equal(seen.accept('bob|1',1),true);assert.equal(seen.accept('alice|2',2),true);
+assert.equal(seen.ids.size,2);assert.equal(seen.accept('alice|1',3),true);
+assert.equal(seen.accept('alice|1',5003),true);
+assert.equal(seen.accept('legacy',6000,1200),true);assert.equal(seen.accept('legacy',6100,1200),false);assert.equal(seen.accept('legacy',7200,1200),true);
+console.log('PASS: bounded exponential retries, retry reset, per-author chat identity, expiry and bounded dedup memory.');

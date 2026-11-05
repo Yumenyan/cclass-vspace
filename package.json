@@ -1,10 +1,10 @@
 {
   "name": "cclass-vspace",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": true,
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node tests/motion.cjs && node tests/smoke.js",
+    "test": "node tests/motion.cjs && node tests/network.cjs && node tests/smoke.js",
     "serve": "node tools/serve.mjs",
     "test:browser": "node tests/visual.cjs",
     "pages": "node tools/prepare-pages.mjs",

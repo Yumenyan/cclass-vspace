@@ -4,7 +4,7 @@
 const $=id=>document.getElementById(id);
 const FH=5,HALF=14,PR=.4;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const R=new THREE.WebGLRenderer({canvas:$('c'),antialias:true,powerPreference:'high-performance'});
+const R=new THREE.WebGLRenderer({canvas:$('c'),antialias:(()=>{try{return JSON.parse(localStorage.getItem('cc_preferences')||'{}').quality==='high'}catch(_){return false}})(),powerPreference:'high-performance'});
 R.setPixelRatio(Math.min(window.devicePixelRatio||1,2));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.outputEncoding=THREE.sRGBEncoding;R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=.95;
 const S=new THREE.Scene();
 (()=>{const c=document.createElement('canvas');c.width=2;c.height=256;const g=c.getContext('2d'),gr=g.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#88afb0');gr.addColorStop(.55,'#e5e7ce');gr.addColorStop(1,'#f6efda');g.fillStyle=gr;g.fillRect(0,0,2,256);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;S.background=t})();
@@ -24,10 +24,13 @@ function setLabel(sp,t){sp.userData.text=t;const o=sp.userData.o,h=o.h||1,fs=48,
 function label(t,o={}){const sp=new THREE.Sprite(new THREE.SpriteMaterial({depthTest:false,transparent:true}));sp.renderOrder=10;sp.userData.o=o;sp.userData.text=t;setLabel(sp,t);return sp}
 function ptex(draw,rep,size){size=size||128;const c=document.createElement('canvas');c.width=c.height=size;draw(c.getContext('2d'),size);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rep,rep);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;return t}
 let _s=7;const rnd=()=>(_s=(_s*16807)%2147483647)/2147483647;
-const COL=[];
-const rect=(f,cx,cz,w,d,o)=>{const c=Object.assign({f,x0:cx-w/2,x1:cx+w/2,z0:cz-d/2,z1:cz+d/2,on:true,y0:0,y1:4.9,standable:false},o||{});COL.push(c);return c};
+const COL=[];let colliderRevision=0;
+const rect=(f,cx,cz,w,d,o)=>{const c=Object.assign({f,x0:cx-w/2,x1:cx+w/2,z0:cz-d/2,z1:cz+d/2,on:true,y0:0,y1:4.9,standable:false},o||{});COL.push(c);colliderRevision++;return c};
+// A floor grid limits collision work to the cells touching the player.
+const colliderGrid=new Map();let gridRevision=-1,gridLength=-1;
+function nearColliders(x,z,f){if(gridRevision!==colliderRevision||gridLength!==COL.length){colliderGrid.clear();for(const c of COL)for(let gx=Math.floor((c.x0-PR)/8);gx<=Math.floor((c.x1+PR)/8);gx++)for(let gz=Math.floor((c.z0-PR)/8);gz<=Math.floor((c.z1+PR)/8);gz++){const key=c.f+'|'+gx+'|'+gz;if(!colliderGrid.has(key))colliderGrid.set(key,[]);colliderGrid.get(key).push(c)}gridRevision=colliderRevision;gridLength=COL.length}return colliderGrid.get(f+'|'+Math.floor(x/8)+'|'+Math.floor(z/8))||[]}
 const ov=(c,x,z)=>x>c.x0-PR&&x<c.x1+PR&&z>c.z0-PR&&z<c.z1+PR;
-function moveOK(nx,nz,ox,oz,f){if(W.canEnterRoom){const r=ROOMS.find(r=>r.f===f&&nx>r.x0&&nx<r.x1&&nz>r.z0&&nz<r.z1);if(r&&!W.canEnterRoom(r)&&!(ox>r.x0&&ox<r.x1&&oz>r.z0&&oz<r.z1))return false}if(Math.abs(nx)>118||Math.abs(nz)>118)return false;for(const c of COL)if(c.on&&c.f===f&&me.y+.08<c.y1&&me.y+1.8>c.y0&&ov(c,nx,nz)&&!ov(c,ox,oz))return false;return true}
+function moveOK(nx,nz,ox,oz,f){if(W.canEnterRoom){const r=ROOMS.find(r=>r.f===f&&nx>r.x0&&nx<r.x1&&nz>r.z0&&nz<r.z1);if(r&&!W.canEnterRoom(r)&&!(ox>r.x0&&ox<r.x1&&oz>r.z0&&oz<r.z1))return false}if(Math.abs(nx)>118||Math.abs(nz)>118)return false;for(const c of nearColliders(nx,nz,f))if(c.on&&c.f===f&&me.y+.08<c.y1&&me.y+1.8>c.y0&&ov(c,nx,nz)&&!ov(c,ox,oz))return false;return true}
 const ACT=[];const act=(f,x,z,r,l,fn)=>{const a={f,x,z,r,l,fn};ACT.push(a);return a};
 function toast(t){const d=document.createElement('div');d.className='toast glass';d.textContent=t;$('toasts').appendChild(d);setTimeout(()=>d.remove(),3200)}
 let returnFocus=null,popCleanup=null;
@@ -198,7 +201,7 @@ function batchStaticBoxes(){
 }
 batchStaticBoxes();
 /* ---------- public API ---------- */
-const W={motion:CC_MOTION,$,THREE,S,FH,mat,bx,rect,label,setLabel,makeAvatar,pop,closePop,toast,act,go,setDoor,doors,rooms:ROOMS,BD,esc,
+const W={networkTools:CC_NETWORK,motion:CC_MOTION,$,THREE,S,FH,mat,bx,rect,label,setLabel,makeAvatar,pop,closePop,toast,act,go,setDoor,doors,rooms:ROOMS,BD,esc,
  refreshVisibility(){visKey=''},get renderer(){return R},get colliders(){return COL},setPopCleanup(fn){popCleanup=fn},get me(){return me},get mode3d(){return mode3d},get cam(){return cam},get pointerLocked(){return document.pointerLockElement===$('c')},lockPointer,unlockPointer,get yaw(){return yaw},faceDirection(angle){yaw=angle;me.ry=angle+Math.PI},resetMotion,jump,get sprinting(){return sprinting},local:meAv,
  roomInfo:INFO,zoneName:z=>ZN[z]||(z==='out'?'屋外':z),onTick:[],roomHandlers:{},member:false,id:'',roomKey:'',canToggle:null,onDoorChange:null,onKnock:null,onZone:null};
 /* ---------- controls ---------- */
@@ -249,7 +252,7 @@ function resize(){R.setSize(innerWidth,innerHeight);const a=innerWidth/innerHeig
 addEventListener('resize',resize);resize();
 function applyVis(){if(W.customWorld)return;BD.forEach(b=>{const inside=b===inB;b.G.forEach((g,f)=>{g.visible=mode3d||!inside||f<=me.f});b.wm.opacity=1;b.wm.transparent=false;b.wm.depthWrite=true;b.gm.opacity=.55})}
 const cameraSlabs=BD.flatMap(b=>Array.from({length:b.fl},(_,i)=>({x0:b.x-HALF-.5,x1:b.x+HALF+.5,z0:b.z-HALF-.5,z1:b.z+HALF+.5,y0:(i+1)*FH-.15,y1:(i+1)*FH+.15})));
-function cameraBoxes(){const boxes=COL.filter(c=>c.on).map(c=>({x0:c.x0,x1:c.x1,z0:c.z0,z1:c.z1,y0:(c.f-1)*FH+c.y0,y1:(c.f-1)*FH+c.y1}));if(!W.customWorld)boxes.push(...cameraSlabs);if(inB&&!W.customWorld){const r=ROOMS.find(r=>r.zone===me.zone);if(r)boxes.push({x0:r.x0,x1:r.x1,z0:r.z0,z1:r.z1,y0:(me.f-1)*FH+4.6,y1:(me.f-1)*FH+4.68})}return boxes}
+const cameraBoxCache=new WeakMap();function cameraBoxes(){const boxes=[];for(const c of COL){if(!c.on||c.x1<me.x-19||c.x0>me.x+19||c.z1<me.z-19||c.z0>me.z+19)continue;let box=cameraBoxCache.get(c);if(!box){box={x0:c.x0,x1:c.x1,z0:c.z0,z1:c.z1,y0:(c.f-1)*FH+c.y0,y1:(c.f-1)*FH+c.y1};cameraBoxCache.set(c,box)}boxes.push(box)}if(!W.customWorld)boxes.push(...cameraSlabs);if(inB&&!W.customWorld){const r=ROOMS.find(r=>r.zone===me.zone);if(r)boxes.push({x0:r.x0,x1:r.x1,z0:r.z0,z1:r.z1,y0:(me.f-1)*FH+4.6,y1:(me.f-1)*FH+4.68})}return boxes}
 
 function zoneAt(){if(W.customWorld)return W.customWorld;if(!inB)return'out';const r=ROOMS.find(r=>r.b===inB&&r.f===me.f&&me.x>r.x0&&me.x<r.x1&&me.z>r.z0&&me.z<r.z1);return r?r.zone:inB.id+me.f}
 const clk=new THREE.Clock();
@@ -262,7 +265,7 @@ function tick(){
  if(l>.08){me.sit=false;const y=mode3d?yaw:0,sn=Math.sin(y),cs=Math.cos(y),sp=(sprinting?10:6)*dt,dx=(ix*cs-iy*sn)*sp,dz=(-ix*sn-iy*cs)*sp;
   const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.15));for(let i=0;i<steps;i++){if(moveOK(me.x+dx/steps,me.z,me.x,me.z,me.f))me.x+=dx/steps;if(moveOK(me.x,me.z+dz/steps,me.x,me.z,me.f))me.z+=dz/steps;}me.ry=Math.atan2(dx,dz)}
  const nb=W.customWorld?null:BD.find(b=>Math.abs(me.x-b.x)<HALF+.3&&Math.abs(me.z-b.z)<HALF+.3)||null;if(!nb&&me.f!==1)me.f=1;inB=nb;
- me.vx=(me.x-startX)/Math.max(dt,.001);me.vz=(me.z-startZ)/Math.max(dt,.001);const floorBase=inB?.16:0;if(me.y<floorBase){me.y=floorBase;me.vy=Math.max(0,me.vy)}const surfaces=[floorBase,...COL.filter(c=>c.on&&c.f===me.f&&c.standable&&ov(c,me.x,me.z)).map(c=>c.y1)];const ceilingLimit=Math.min(inB?FH-1.9:Infinity,...COL.filter(c=>c.on&&c.f===me.f&&c.y0>me.y+1.7&&ov(c,me.x,me.z)).map(c=>c.y0-1.8));CC_MOTION.vertical(me,dt,surfaces,ceilingLimit);
+ me.vx=(me.x-startX)/Math.max(dt,.001);me.vz=(me.z-startZ)/Math.max(dt,.001);const floorBase=inB?.16:0;if(me.y<floorBase){me.y=floorBase;me.vy=Math.max(0,me.vy)}const nearby=nearColliders(me.x,me.z,me.f),surfaces=[floorBase,...nearby.filter(c=>c.on&&c.f===me.f&&c.standable&&ov(c,me.x,me.z)).map(c=>c.y1)];const ceilingLimit=Math.min(inB?FH-1.9:Infinity,...nearby.filter(c=>c.on&&c.f===me.f&&c.y0>me.y+1.7&&ov(c,me.x,me.z)).map(c=>c.y0-1.8));CC_MOTION.vertical(me,dt,surfaces,ceilingLimit);
  const vk=(inB?inB.id:'')+me.f;if(vk!==visKey){visKey=vk;applyVis()}
  const zn=zoneAt();if(zn!==zone){zone=zn;me.zone=zn;$('locn').textContent=zn==='out'?(Math.hypot(me.x,me.z)<21?'中央庭園':'通り'):(W.customWorld?W.customWorldName:ZN[zn]||zn);W.onZone&&W.onZone(zn)}
  else if(zn==='out'){const t=Math.hypot(me.x,me.z)<21?'中央庭園':'通り';if($('locn').textContent!==t)$('locn').textContent=t}
@@ -282,6 +285,6 @@ function tick(){
  cur=best;const ab=$('act');if(best){if(ab.hidden)ab.hidden=false;if($('actl').textContent!==best.t)$('actl').textContent=best.t}else if(!ab.hidden)ab.hidden=true;
  fj.position.y=2.9+Math.sin(performance.now()/700)*.08;
  for(let i=0;i<W.onTick.length;i++)W.onTick[i](dt);
- if(!document.hidden&&!W.renderPaused)R.render(S,cam);
+ if(!document.hidden&&!W.renderPaused&&(!W.performance||W.performance.shouldRender(performance.now())))R.render(S,cam);
 }
 tick();

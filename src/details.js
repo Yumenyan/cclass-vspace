@@ -1,6 +1,6 @@
 /* Authored campus: procedural PBR surfaces, furnishings and instanced architectural detail. */
 (()=>{
-const T=W.THREE,low=W.prefs.quality==='low',groups=[],lightMaterials=[],ceilings=[];
+const T=W.THREE,low=(W.performance?.level||W.prefs.quality)==='low',groups=[],lightMaterials=[],ceilings=[];
 const geometry={box:new T.BoxGeometry(1,1,1),cylinder:new T.CylinderGeometry(.5,.5,1,16),sphere:new T.SphereGeometry(.5,16,12)};
 const roundedShape=new T.Shape(),corner=.1,a=.47;roundedShape.moveTo(-a+corner,-a);roundedShape.lineTo(a-corner,-a);roundedShape.quadraticCurveTo(a,-a,a,-a+corner);roundedShape.lineTo(a,a-corner);roundedShape.quadraticCurveTo(a,a,a-corner,a);roundedShape.lineTo(-a+corner,a);roundedShape.quadraticCurveTo(-a,a,-a,a-corner);roundedShape.lineTo(-a,-a+corner);roundedShape.quadraticCurveTo(-a,-a,-a+corner,-a);
 geometry.rounded=low?geometry.box:new T.ExtrudeGeometry(roundedShape,{depth:.88,bevelEnabled:true,bevelThickness:.06,bevelSize:.03,bevelSegments:2,curveSegments:3,steps:1});if(!low)geometry.rounded.translate(0,0,-.44);
@@ -18,7 +18,7 @@ function surface(name,color,kind,rough=.8){
   if(kind==='metal'){h=Math.sin(y*2.8)*.015;tint=1+(n-.5)*.035}
   heights[i]=h;const k=i*4;albedo[k]=Math.min(255,base.r*255*tint);albedo[k+1]=Math.min(255,base.g*255*tint);albedo[k+2]=Math.min(255,base.b*255*tint);albedo[k+3]=255;roughness[k]=roughness[k+1]=roughness[k+2]=Math.min(255,(rough+(n-.5)*.08)*255);roughness[k+3]=255;
  }
- for(let y=0;y<size;y++)for(let x=0;x<size;x++){const i=y*size+x,k=i*4,dx=heights[y*size+(x+1)%size]-heights[y*size+(x+size-1)%size],dy=heights[((y+1)%size)*size+x]-heights[((y+size-1)%size)*size+x],v=new T.Vector3(-dx*2,-dy*2,1).normalize();normal[k]=(v.x*.5+.5)*255;normal[k+1]=(v.y*.5+.5)*255;normal[k+2]=(v.z*.5+.5)*255;normal[k+3]=255}
+ for(let y=0;y<size;y++)for(let x=0;x<size;x++){const i=y*size+x,k=i*4,dx=heights[y*size+(x+1)%size]-heights[y*size+(x+size-1)%size],dy=heights[((y+1)%size)*size+x]-heights[((y+size-1)%size)*size+x],length=Math.sqrt(dx*dx*4+dy*dy*4+1);normal[k]=(-dx/length+.5)*255;normal[k+1]=(-dy/length+.5)*255;normal[k+2]=(.5/length+.5)*255;normal[k+3]=255}
  const texture=data=>{const tex=new T.DataTexture(data,size,size,T.RGBAFormat);tex.wrapS=tex.wrapT=T.RepeatWrapping;tex.magFilter=T.LinearFilter;tex.minFilter=T.LinearMipmapLinearFilter;tex.generateMipmaps=true;tex.anisotropy=4;tex.needsUpdate=true;return tex};
  const map=texture(albedo);map.encoding=T.sRGBEncoding;const nmap=texture(normal),rmap=texture(roughness);textures[name]={map,normalMap:low?null:nmap,roughnessMap:low?null:rmap};
  return materials[name]=new T.MeshStandardMaterial({map,normalMap:low?null:nmap,roughnessMap:low?null:rmap,roughness:1,normalScale:new T.Vector2(.5,.5),metalness:kind==='metal'?.7:.015,envMapIntensity:.45});
@@ -79,7 +79,7 @@ for(const b of W.BD){b.wm.map=plaster.map;b.wm.normalMap=plaster.normalMap;b.wm.
 // Fully furnished rooms share a canonical layout: entry at +Z, window wall at -Z.
 for(const r of W.rooms){
  const rotation={n:0,s:Math.PI,w:Math.PI/2,e:-Math.PI/2}[r.b.door]+(r.s<3?Math.PI/2:-Math.PI/2),g=group(r.b.G[r.f],r.cx,(r.f-1)*FH,r.cz,rotation,r.f);
- r.detailYaw=rotation;g.updateWorldMatrix(true,false);r.detailScreen=g.localToWorld(new T.Vector3(0,2,-3.43));r.detailPreview=g.localToWorld(new T.Vector3(0,.55,1.4));
+ r.detailGroup=g;r.detailYaw=rotation;g.updateWorldMatrix(true,false);r.detailScreen=g.localToWorld(new T.Vector3(0,2,-3.43));r.detailPreview=g.localToWorld(new T.Vector3(0,.55,1.4));
  plane(g,0,.19,0,7.75,7.75,r.k==='smash'?stoneFloor:floorMat,-Math.PI/2);
  for(const side of [-1,1]){box(g,side*3.78,.28,0,.07,.18,7.6,walnut);box(g,side*3.76,3.15,0,.09,.09,7.6,oak);box(g,side*3.72,3.23,0,.03,.035,7.4,warm)}box(g,0,.28,-3.78,7.6,.18,.07,walnut);box(g,0,3.16,-3.78,7.6,.09,.09,oak);
  const ceiling=plane(g,0,4.6,0,7.8,7.8,plaster,Math.PI/2);ceiling.visible=false;ceilings.push({r,ceiling});pendant(g,0,-1,1.4);plant(g,3.15,2.9,.85);
@@ -127,8 +127,8 @@ W.onTick.push(()=>{const r=W.rooms.find(r=>r.zone===W.me.zone);fill.intensity=r&
 if(W.solar)W.onLighting(W.solar);
 // Flatten authored furnishings into material/geometry batches while preserving floor visibility.
 let instanceCount=0,batchCount=0;
-const roots=[outdoor,...W.BD.flatMap(b=>b.G.filter(Boolean))];S.updateMatrixWorld(true);
+const roots=[outdoor,...groups.filter(g=>W.BD.some(b=>b.G.includes(g.parent)))];S.updateMatrixWorld(true);
 for(const root of roots){const batches=new Map(),inverse=new T.Matrix4().copy(root.matrixWorld).invert();root.traverse(m=>{if(!m.isMesh||m.isInstancedMesh||!m.userData||m===root||ceilings.some(x=>x.ceiling===m)||m.geometry.type==='PlaneGeometry'||!Object.values(geometry).includes(m.geometry))return;const key=m.geometry.uuid+'|'+m.material.uuid;if(!batches.has(key))batches.set(key,[]);batches.get(key).push(m)});for(const items of batches.values()){if(items.length<3)continue;const batch=new T.InstancedMesh(items[0].geometry.clone(),items[0].material,items.length);batch.castShadow=!low;batch.receiveShadow=true;batch.frustumCulled=true;const bounds=new T.Box3();items.forEach((m,i)=>{const matrix=new T.Matrix4().multiplyMatrices(inverse,m.matrixWorld);batch.setMatrixAt(i,matrix);if(!m.geometry.boundingBox)m.geometry.computeBoundingBox();bounds.union(m.geometry.boundingBox.clone().applyMatrix4(matrix));m.parent.remove(m)});batch.geometry.boundingSphere=bounds.getBoundingSphere(new T.Sphere());batch.instanceMatrix.needsUpdate=true;root.add(batch);instanceCount+=items.length;batchCount++}}
 S.traverse(o=>{if(o.userData.buildingName)o.visible=W.prefs.showBuildingNames!==false});
-W.detailStats={instances:instanceCount,batches:batchCount,materials:Object.keys(materials).length,rooms:W.rooms.length};
+W.performance?.refresh();W.detailStats={instances:instanceCount,batches:batchCount,materials:Object.keys(materials).length,rooms:W.rooms.length};
 })();

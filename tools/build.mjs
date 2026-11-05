@@ -26,7 +26,7 @@ const member=read('src/member.js').replace('@@IDS@@',JSON.stringify(ids)).replac
 const bi=randomBytes(12);
 const enc={n,u:ids.map(id=>{const salt=randomBytes(16),iv=randomBytes(12);return {h:createHash('sha256').update('cc:'+id.toLowerCase()).digest('hex').slice(0,16),s:salt.toString('base64'),i:iv.toString('base64'),d:encrypt(pbkdf2Sync(secrets.passwords[id],salt,n,32,'sha256'),iv,key)};}),bi:bi.toString('base64'),b:encrypt(key,bi,Buffer.from(member))};
 let html=read('src/index.template.html');
-const replacements={'@@ENC@@':JSON.stringify(enc),'@@CFG@@':safe(read('config.json')),'@@SOUND@@':safe(read('src/sound.js')),'@@MOTION@@':safe(read('src/motion.js')),'@@ATMOSPHERE@@':safe(read('src/atmosphere.js')),'@@DETAILS@@':safe(read('src/details.js')),'@@ICONS@@':safe(read('src/icons.js')),'@@WORLD@@':safe(read('src/world.js')),'@@EXPERIENCE@@':safe(read('src/experience.js')),'@@AUTH@@':safe(read('src/auth.js')),'@@STYLE@@':read('src/style.css')};
+const replacements={'@@ENC@@':JSON.stringify(enc),'@@CFG@@':safe(read('config.json')),'@@SOUND@@':safe(read('src/sound.js')),'@@NETWORK@@':safe(read('src/network.js')),'@@PERFORMANCE@@':safe(read('src/performance.js')),'@@MOTION@@':safe(read('src/motion.js')),'@@ATMOSPHERE@@':safe(read('src/atmosphere.js')),'@@DETAILS@@':safe(read('src/details.js')),'@@ICONS@@':safe(read('src/icons.js')),'@@WORLD@@':safe(read('src/world.js')),'@@EXPERIENCE@@':safe(read('src/experience.js')),'@@AUTH@@':safe(read('src/auth.js')),'@@STYLE@@':read('src/style.css')};
 for(const [token,value] of Object.entries(replacements))html=html.replace(token,()=>value);
 if(/@@[A-Z]+@@/.test(html))throw Error('Unresolved build token');
 writeFileSync(resolve(root,'index.html'),html);
