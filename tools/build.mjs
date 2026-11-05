@@ -1,9 +1,13 @@
 // Native Node build: the same envelope format as build.py, without Python dependencies.
-import {readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync} from 'node:fs';
+import {readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomBytes, createHash, pbkdf2Sync, createCipheriv} from 'node:crypto';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+mkdirSync(resolve(root,'vendor'),{recursive:true});
+for(const [from,to] of [['three/build/three.min.js','three.min.js'],['peerjs/dist/peerjs.min.js','peerjs.min.js'],['three/examples/js/loaders/GLTFLoader.js','GLTFLoader.js']])copyFileSync(resolve(root,'node_modules',from),resolve(root,'vendor',to));
+copyFileSync(resolve(root,'node_modules/three/LICENSE'),resolve(root,'vendor/THREE-LICENSE.txt'));
+copyFileSync(resolve(root,'node_modules/peerjs/LICENSE'),resolve(root,'vendor/PEERJS-LICENSE.txt'));
 const read=p=>readFileSync(resolve(root,p),'utf8');
 const safe=s=>s.replace(/<\//g,'<\\/');
 const ids=JSON.parse(read('tools/accounts.json'));

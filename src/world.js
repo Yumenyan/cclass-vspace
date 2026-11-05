@@ -189,8 +189,8 @@ js.onpointerdown=e=>{js.setPointerCapture(e.pointerId);jm(e)};js.onpointermove=e
 $('bMode').onclick=()=>{mode3d=!mode3d;$('bMode').firstChild.textContent=mode3d?'map':'view_in_ar';S.fog=mode3d?FOG:null;$('bMode').classList.toggle('on',!mode3d);$('bMode').title=mode3d?'上空視点に切り替え（V）':'3D視点に切り替え（V）'};
 function resize(){R.setSize(innerWidth,innerHeight);const a=innerWidth/innerHeight;persp.aspect=a;persp.updateProjectionMatrix();const s=26;ortho.left=-s*a;ortho.right=s*a;ortho.top=s;ortho.bottom=-s;ortho.updateProjectionMatrix()}
 addEventListener('resize',resize);resize();
-function applyVis(){BD.forEach(b=>{const inside=b===inB;b.G.forEach((g,f)=>{g.visible=!inside||f<=me.f});b.wm.opacity=inside?.25:1;b.gm.opacity=inside?.1:.55})}
-function zoneAt(){if(!inB)return'out';const r=ROOMS.find(r=>r.b===inB&&r.f===me.f&&me.x>r.x0&&me.x<r.x1&&me.z>r.z0&&me.z<r.z1);return r?r.zone:inB.id+me.f}
+function applyVis(){if(W.customWorld)return;BD.forEach(b=>{const inside=b===inB;b.G.forEach((g,f)=>{g.visible=!inside||f<=me.f});b.wm.opacity=inside?.25:1;b.gm.opacity=inside?.1:.55})}
+function zoneAt(){if(W.customWorld)return W.customWorld;if(!inB)return'out';const r=ROOMS.find(r=>r.b===inB&&r.f===me.f&&me.x>r.x0&&me.x<r.x1&&me.z>r.z0&&me.z<r.z1);return r?r.zone:inB.id+me.f}
 const clk=new THREE.Clock();
 function tick(){
  requestAnimationFrame(tick);
@@ -200,9 +200,9 @@ function tick(){
  if(!$('gate').hidden)yaw+=dt*.07;
  if(l>.08){me.sit=false;const y=mode3d?yaw:0,sn=Math.sin(y),cs=Math.cos(y),sp=((keys.ShiftLeft||keys.ShiftRight)?10:6)*dt,dx=(ix*cs-iy*sn)*sp,dz=(-ix*sn-iy*cs)*sp;
   const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.15));for(let i=0;i<steps;i++){if(moveOK(me.x+dx/steps,me.z,me.x,me.z,me.f))me.x+=dx/steps;if(moveOK(me.x,me.z+dz/steps,me.x,me.z,me.f))me.z+=dz/steps;}me.ry=Math.atan2(dx,dz)}
- const nb=BD.find(b=>Math.abs(me.x-b.x)<HALF+.3&&Math.abs(me.z-b.z)<HALF+.3)||null;if(!nb&&me.f!==1)me.f=1;inB=nb;
+ const nb=W.customWorld?null:BD.find(b=>Math.abs(me.x-b.x)<HALF+.3&&Math.abs(me.z-b.z)<HALF+.3)||null;if(!nb&&me.f!==1)me.f=1;inB=nb;
  const vk=(inB?inB.id:'')+me.f;if(vk!==visKey){visKey=vk;applyVis()}
- const zn=zoneAt();if(zn!==zone){zone=zn;me.zone=zn;$('locn').textContent=zn==='out'?(Math.hypot(me.x,me.z)<21?'中央庭園':'通り'):(ZN[zn]||zn);W.onZone&&W.onZone(zn)}
+ const zn=zoneAt();if(zn!==zone){zone=zn;me.zone=zn;$('locn').textContent=zn==='out'?(Math.hypot(me.x,me.z)<21?'中央庭園':'通り'):(W.customWorld?W.customWorldName:ZN[zn]||zn);W.onZone&&W.onZone(zn)}
  else if(zn==='out'){const t=Math.hypot(me.x,me.z)<21?'中央庭園':'通り';if($('locn').textContent!==t)$('locn').textContent=t}
  me.zone=zone;
  const py=(me.f-1)*FH;meAv.g.position.set(me.x,py,me.z);meAv.body.rotation.y=me.ry;meAv.body.position.y=me.sit?-.32:0;
@@ -210,7 +210,7 @@ function tick(){
  else{cam=ortho;cam.up.set(0,0,-1);cam.position.set(me.x,py+80,me.z);cam.lookAt(me.x,py,me.z)}
  sun.position.set(me.x+32,py+62,me.z+22);sun.target.position.set(me.x,py,me.z);
  AVS.forEach(a=>{a.plate.rotation.set(mode3d?0:-Math.PI/2,mode3d?yaw:0,0);const speed=a.g.position.distanceTo(a.prev)/Math.max(dt,.001);a.step+=dt*Math.min(speed,8)*2.1;a.legs.forEach((leg,i)=>leg.rotation.x=speed>.1?Math.sin(a.step+i*Math.PI)*.42:0);a.arms.forEach((arm,i)=>arm.rotation.x=speed>.1?-Math.sin(a.step+i*Math.PI)*.35:0);a.prev.copy(a.g.position)});
- let best=null,bd=1e9;for(const a of ACT){if(a.f!==me.f)continue;const d=Math.hypot(me.x-a.x,me.z-a.z);if(d<a.r&&d<bd){const t=typeof a.l==='function'?a.l():a.l;if(t){best=a;bd=d;a.t=t}}}
+ let best=null,bd=1e9;for(const a of ACT){if(W.customWorld||a.f!==me.f)continue;const d=Math.hypot(me.x-a.x,me.z-a.z);if(d<a.r&&d<bd){const t=typeof a.l==='function'?a.l():a.l;if(t){best=a;bd=d;a.t=t}}}
  cur=best;const ab=$('act');if(best){if(ab.hidden)ab.hidden=false;if($('actl').textContent!==best.t)$('actl').textContent=best.t}else if(!ab.hidden)ab.hidden=true;
  fj.position.y=2.9+Math.sin(performance.now()/700)*.08;
  for(let i=0;i<W.onTick.length;i++)W.onTick[i](dt);

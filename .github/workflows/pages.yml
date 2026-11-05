@@ -8,8 +8,11 @@ jobs:
     environment: { name: github-pages, url: '${{ steps.d.outputs.page_url }}' }
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node tools/prepare-pages.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
-        with: { path: . }
+        with: { path: _site }
       - id: d
         uses: actions/deploy-pages@v4

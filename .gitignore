@@ -1,2 +1,6 @@
 tools/secrets.local.json
 node_modules/
+_site/
+test-results/
+playwright-report/
+artifacts/

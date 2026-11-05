@@ -43,8 +43,8 @@
  <p class="note">ゲストでも街を自由に散策できます。会話や部屋の機能はメンバーでログインすると使えます。</p><span class="secure-note"><span class="ms">lock</span> メンバーだけのプライベートな集まり</span></div>
 </div>
 <div id="fatal" hidden role="alert"><h2>空間を読み込めませんでした</h2><p>ブラウザーのWebGL設定とインターネット接続を確認し、再読み込みしてください。</p><button onclick="location.reload()">再読み込み</button></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/peerjs.min.js"></script>
 <script>const ENC=@@ENC@@;window.CC_CONFIG=@@CFG@@;</script>
 <script>
 window.addEventListener("error", e => { if (!window.WORLD_READY && /THREE|WebGL/.test(e.message)) document.getElementById("fatal").hidden=false; });

@@ -18,7 +18,7 @@ $('cs').onclick=sendChat;$('ci').onkeydown=e=>{if(e.key==='Enter')sendChat()};
 msg('','ようこそ、'+st.name+' さん','sys');
 /* ---- network: serverless mesh over PeerJS public broker, rooms namespaced by a key only members can derive ---- */
 const NS='cclass-'+W.roomKey,MAXS=16,peers=new Map();
-let peer=null,mySlot=-1,stream=null,ctx=null,scanT=null;
+let micPending=false;let peer=null,mySlot=-1,stream=null,ctx=null,scanT=null;
 const PO=Object.assign({},CFG.peer||{});if(CFG.ice)PO.config={iceServers:CFG.ice};
 function setNet(s){const e=$('stat');e.dataset.s=s;$('statt').textContent={wait:'接続中…',ok:'オンライン',full:'満室（同時接続上限）',err:'接続エラー'}[s]||s}
 const closedList=()=>Object.keys(W.doors).filter(z=>W.doors[z].closed);
@@ -46,10 +46,10 @@ function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!==
  if(d.t==='hi'&&(typeof d.name!=='string'||d.name.length>32||typeof d.id!=='string'||!IDS.includes(d.id)))return;
  if(d.t==='hi'){const first=!p.av;p.name=d.name;p.id=d.id;p.minutes=Math.max(0,Math.min(100000,Number(d.minutes)||0));if(first){p.av=W.makeAvatar(d.name,d.col);p.av.g.position.set(p.x,0,p.z)}else{p.av.setName(d.name);p.av.setColor(d.col)}
   if(typeof d.av==='string'&&d.av.length<250000&&(!d.av||/^data:image\/(webp|png|jpeg);base64,/.test(d.av))&&p.avUrl!==d.av){p.avUrl=d.av;p.av.setImage(d.av||'')}
-  if(Array.isArray(d.dr))d.dr.slice(0,100).forEach(z=>{const r=W.doors[z]?.room;if(r&&(r.k!=='private'||IDS[r.own]===p.id))W.setDoor(z,true,true)});if(typeof d.glb==='string'&&d.glb.length<2048&&W.setAvatarModel)W.setAvatarModel(p.av,d.glb);
+  if(Array.isArray(d.dr))d.dr.slice(0,100).forEach(z=>{const r=W.doors[z]?.room;if(r&&(r.k!=='private'||IDS[r.own]===p.id))W.setDoor(z,true,true)});if(typeof d.glb==='string'&&d.glb.length<2048&&W.setAvatarModel&&p.glb!==d.glb){p.glb=d.glb;W.setAvatarModel(p.av,d.glb)}
   if(first){msg('',d.name+' が参加しました','sys');if(stream)callPeer(p);updPC()}}
  else if(!p.av)return;
- else if(d.t==='p'){if(![d.x,d.z,d.f,d.ry].every(Number.isFinite)||Math.abs(d.x)>118||Math.abs(d.z)>118||!Number.isInteger(d.f)||d.f<1||d.f>3||typeof d.zn!=='string'||d.zn.length>80)return;p.tx=d.x;p.tz=d.z;p.f=d.f;p.zn=d.zn;p.ry=d.ry;p.sit=!!d.s;if(p.first){p.first=false;p.av.g.position.set(d.x,(d.f-1)*FH,d.z)}}
+ else if(d.t==='p'){if(![d.x,d.z,d.f,d.ry].every(Number.isFinite)||Math.abs(d.x)>118||Math.abs(d.z)>118||!Number.isInteger(d.f)||d.f<1||d.f>3||typeof d.zn!=='string'||d.zn.length>80)return;p.world=typeof d.world==='string'?d.world.slice(0,80):'';p.tx=d.x;p.tz=d.z;p.f=d.f;p.zn=d.zn;p.ry=d.ry;p.sit=!!d.s;if(p.first){p.first=false;p.av.g.position.set(d.x,(d.f-1)*FH,d.z)}}
  else if(d.t==='c'){if(typeof d.m!=='string'||d.m.length>200||d.room&&d.room!==W.me.zone)return;msg(p.name+(d.room?' · この部屋':''),d.m);p.av.say(d.m.slice(0,60));if(!chat.classList.contains('open')){unread++;$('unread').textContent=unread>9?'9+':unread;$('unread').hidden=false}}
  else if(d.t==='dr'){const target=W.doors[d.z]?.room;if(!target||target.k==='private'&&IDS[target.own]!==p.id)return;W.setDoor(d.z,!!d.c,true);const r=W.doors[d.z]&&W.doors[d.z].room;if(r)msg('',p.name+' が'+r.n+'のドアを'+(d.c?'閉めました':'開けました'),'sys')}
  else memberHandlers.forEach(fn=>fn(p,d));
@@ -64,22 +64,22 @@ function voiceOut(pid){const v=vc.get(pid);if(!v)return;try{v.src.disconnect();v
 function callPeer(p){if(!stream||!peer||calls.has(p.pid))return;const c=peer.call(p.pid,stream);calls.set(p.pid,c);c.on('close',()=>calls.delete(p.pid))}
 function micUI(on){$('bMic').classList.toggle('on',on);$('bMic').firstChild.textContent=on?'mic':'mic_off';const r=document.getElementById('rbMic');if(r)r.classList.toggle('on',on)}
 async function mic(on){
- if(on){try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}catch(e){W.toast('マイクを使えませんでした（HTTPSと許可設定を確認）');return}
+ if(on){if(stream||micPending)return;micPending=true;try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}catch(e){W.toast('マイクを使えませんでした（HTTPSと許可設定を確認）');return}finally{micPending=false}
   ctxInit();peers.forEach(callPeer);micUI(true);W.toast('マイクON：近くの人に声が届きます')}
  else{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;calls.forEach(c=>{try{c.close()}catch(e){}});calls.clear();micUI(false)}
 }
 $('bMic').onclick=()=>mic(!stream);
 const VR=24;
-function vol(p){const m=W.me,g=p.av.g.position;let d=Math.hypot(g.x-m.x,g.z-m.z)+Math.abs(p.f-m.f)*8;
+function vol(p){if((p.world||'')!==(W.customWorld||''))return 0;const m=W.me,g=p.av.g.position;let d=Math.hypot(g.x-m.x,g.z-m.z)+Math.abs(p.f-m.f)*8;
  if(p.zn!==m.zone){const a=W.doors[p.zn],b=W.doors[m.zone];if((a&&a.closed)||(b&&b.closed))return 0}
  return d>=VR?0:Math.pow(1-d/VR,1.3)}
 /* ---- per-frame: broadcast own state, interpolate remotes, voice gains, ring ---- */
 let acc=0,hb=0,last='';
 W.onTick.push(dt=>{
  acc+=dt;hb+=dt;const m=W.me;
- if(acc>=.1){acc=0;const s=JSON.stringify({t:'p',x:+m.x.toFixed(2),z:+m.z.toFixed(2),f:m.f,ry:+m.ry.toFixed(2),zn:m.zone,s:m.sit?1:0});if(s!==last||hb>1){last=s;hb=0;send(JSON.parse(s))}}
+ if(acc>=.1){acc=0;const s=JSON.stringify({t:'p',x:+m.x.toFixed(2),z:+m.z.toFixed(2),f:m.f,ry:+m.ry.toFixed(2),zn:m.zone,s:m.sit?1:0,world:W.customWorld||''});if(s!==last||hb>1){last=s;hb=0;send(JSON.parse(s))}}
  const k=1-Math.exp(-dt*10);
- peers.forEach(p=>{if(!p.av||p.first)return;const g=p.av.g.position;g.x+=(p.tx-g.x)*k;g.z+=(p.tz-g.z)*k;g.y=(p.f-1)*FH;p.av.body.rotation.y=p.ry;p.av.body.position.y=p.sit?-.32:0;
+ peers.forEach(p=>{if(!p.av||p.first)return;p.av.g.visible=!blocked.has(p.pid)&&(p.world||'')===(W.customWorld||'');const g=p.av.g.position;g.x+=(p.tx-g.x)*k;g.z+=(p.tz-g.z)*k;g.y=(p.f-1)*FH;p.av.body.rotation.y=p.ry;p.av.body.position.y=p.sit?-.32:0;
   const v=vc.get(p.pid);if(v&&ctx)v.g.gain.setTargetAtTime(deafen||muted.has(p.pid)||blocked.has(p.pid)?0:vol(p)*voiceVolume,ctx.currentTime,.1)});
 
 });
@@ -96,18 +96,7 @@ W.bx(1.3,1.7,.8,13,.85,-5,0x26303c);W.bx(1,.7,.06,13,1.25,-4.58,W.mat(0x4cc9b0,{
 {const l=W.label('仮想端末',{h:.5});l.position.set(13,2.6,-5);W.S.add(l)}W.rect(1,13,-5,1.3,.8);
 W.act(1,13,-3.6,3.4,'📟 仮想端末（チャット）',()=>{chat.classList.add('open');$('bChat').classList.add('on');setTimeout(()=>$('ci').focus(),50)});
 /* ---- people / settings ---- */
-const oldPeople=()=>{const rows=[[st.name+'（あなた）',W.zoneName(W.me.zone),!!stream]].concat([...peers.values()].filter(p=>p.av).map(p=>[p.name,W.zoneName(p.zn),vc.has(p.pid)]));
- W.pop(rows.map(r=>'<div class="pl"><span>'+W.esc(r[0])+'</span><span class="mut">'+W.esc(r[1])+(r[2]?' 🎙':'')+'</span></div>').join(''),'オンライン '+rows.length+'人')};
 const COLS=[0x4c8bf5,0x4cc9b0,0xe8955a,0xd96b8a,0x9b7be8,0xe6c04c,0x3a4654];
-const oldSettings=()=>{
- const b=W.pop('<p class="mut">アカウントID: '+W.esc(myId)+'</p><label class="mut">表示名（いつでも変更できます）</label><input id="nm" class="fld" maxlength="16" value="'+W.esc(st.name)+'"><label class="mut">アバターの色</label><div class="row" id="cols"></div><label class="mut">アバター画像（2Dイラスト）</label><div class="row"><input type="file" id="avf" accept="image/*" hidden><button class="btn sub" id="avb" style="width:auto">画像を選ぶ</button><button class="btn sub" id="avx" style="width:auto">画像を外す</button></div><div class="row"><button class="btn" id="sv">保存</button></div><div class="row"><button class="btn sub" id="lo">ログアウト（この端末の保存を削除）</button></div>','設定');
- let col=st.color,img=st.av;const cr=b.querySelector('#cols');
- COLS.forEach(c=>{const s=document.createElement('button');s.className='sw'+(c===col?' sel':'');s.style.background='#'+c.toString(16).padStart(6,'0');s.onclick=()=>{col=c;cr.querySelectorAll('.sw').forEach(x=>x.classList.remove('sel'));s.classList.add('sel')};cr.appendChild(s)});
- b.querySelector('#avb').onclick=()=>b.querySelector('#avf').click();b.querySelector('#avx').onclick=()=>{img='';W.toast('保存で画像が外れます')};
- b.querySelector('#avf').onchange=e=>{const f=e.target.files[0];if(!f)return;const u=URL.createObjectURL(f),im=new Image();im.onload=()=>{const k=Math.min(1,256/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);img=c.toDataURL('image/webp',.85);URL.revokeObjectURL(u);W.toast('画像を読み込みました。保存を押してください')};im.src=u};
- b.querySelector('#sv').onclick=()=>{const n=b.querySelector('#nm').value.trim()||myId;st.name=n;st.color=col;st.av=img;LS.setItem('cc_name_'+myId,n);LS.setItem('cc_col_'+myId,col);try{LS.setItem('cc_av_'+myId,img)}catch(e){}meAv.setName(n);meAv.setColor(col);meAv.setImage(img);send(hello());W.closePop();W.toast('保存しました')};
- b.querySelector('#lo').onclick=()=>{LS.removeItem('cc_auth');location.reload()};
-};
 addEventListener('beforeunload',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());try{peer&&peer.destroy()}catch(e){}});
 $('bChat').classList.toggle('on',chat.classList.contains('open'));
 @@FACILITIES@@
