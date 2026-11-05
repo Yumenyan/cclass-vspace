@@ -9,7 +9,7 @@ const st={name:LS.getItem('cc_name_'+myId)||myId,color:+(LS.getItem('cc_col_'+my
 const meAv=W.local;meAv.setName(st.name);meAv.setColor(st.color);if(st.av)meAv.setImage(st.av);
 /* ---- chat ---- */
 const log=$('log');
-function msg(n,t,cls){const d=document.createElement('div');d.className='m '+(cls||'');if(n){const b=document.createElement('b');b.textContent=n;d.appendChild(b)}const time=document.createElement('time');time.textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});d.appendChild(time);const s=document.createElement('span');s.textContent=t;d.appendChild(s);log.appendChild(d);log.scrollTop=log.scrollHeight;while(log.children.length>150)log.firstChild.remove()}
+function msg(n,t,cls){const d=document.createElement('div');d.className='m '+(cls||'');if(n){const b=document.createElement('b');b.textContent=n;d.appendChild(b)}const time=document.createElement('time');time.textContent=W.clock?W.clock.time():new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});d.appendChild(time);const s=document.createElement('span');s.textContent=t;d.appendChild(s);log.appendChild(d);log.scrollTop=log.scrollHeight;while(log.children.length>150)log.firstChild.remove()}
 const chat=$('chat');
 $('bChat').onclick=()=>{unread=0;$('unread').hidden=true;chat.classList.toggle('open');$('welcome').hidden=true;$('bChat').classList.toggle('on',chat.classList.contains('open'))};
 $('chatClose').onclick=()=>{chat.classList.remove('open');$('bChat').classList.remove('on')};
@@ -22,7 +22,7 @@ let micPending=false;let peer=null,mySlot=-1,stream=null,ctx=null,scanT=null;
 const PO=Object.assign({},CFG.peer||{});if(CFG.ice)PO.config={iceServers:CFG.ice};
 function setNet(s){const e=$('stat');e.dataset.s=s;$('statt').textContent={wait:'接続中…',ok:'オンライン',full:'満室（同時接続上限）',err:'接続エラー'}[s]||s}
 const closedList=()=>Object.keys(W.doors).filter(z=>W.doors[z].closed);
-const hello=()=>({t:'hi',id:myId,name:st.name,col:st.color,av:st.av,glb:st.glb||'',dr:closedList(),minutes:Math.floor((Date.now()-joinedAt)/60000)});const joinedAt=Date.now();
+const hello=()=>({t:'hi',id:myId,name:st.name,col:st.color,av:st.av,glb:st.glb||'',dr:closedList(),minutes:Math.floor((performance.now()-joinedAt)/60000)});const joinedAt=performance.now();
 function send(m){peers.forEach(p=>{try{if(p.conn.open)p.conn.send(m)}catch(e){}})}
 function updPC(){$('pc').textContent=peers.size+1}
 function startPeer(s){
@@ -49,8 +49,15 @@ function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!==
   if(Array.isArray(d.dr))d.dr.slice(0,100).forEach(z=>{const r=W.doors[z]?.room;if(r&&(r.k!=='private'||IDS[r.own]===p.id))W.setDoor(z,true,true)});if(typeof d.glb==='string'&&d.glb.length<2048&&W.setAvatarModel&&p.glb!==d.glb){p.glb=d.glb;W.setAvatarModel(p.av,d.glb)}
   if(first){msg('',d.name+' が参加しました','sys');if(stream)callPeer(p);updPC()}}
  else if(!p.av)return;
- else if(d.t==='p'){if(![d.x,d.z,d.f,d.ry].every(Number.isFinite)||Math.abs(d.x)>118||Math.abs(d.z)>118||!Number.isInteger(d.f)||d.f<1||d.f>3||typeof d.zn!=='string'||d.zn.length>80)return;p.world=typeof d.world==='string'?d.world.slice(0,80):'';p.tx=d.x;p.tz=d.z;p.f=d.f;p.zn=d.zn;p.ry=d.ry;p.sit=!!d.s;if(p.first){p.first=false;p.av.g.position.set(d.x,(d.f-1)*FH,d.z)}}
- else if(d.t==='c'){if(typeof d.m!=='string'||d.m.length>200||d.room&&d.room!==W.me.zone)return;msg(p.name+(d.room?' · この部屋':''),d.m);p.av.say(d.m.slice(0,60));if(!chat.classList.contains('open')){unread++;$('unread').textContent=unread>9?'9+':unread;$('unread').hidden=false}}
+ else if(d.t==='p'){
+  if(![d.x,d.z,d.f,d.ry].every(Number.isFinite)||Math.abs(d.x)>118||Math.abs(d.z)>118||!Number.isInteger(d.f)||d.f<1||d.f>3||typeof d.zn!=='string'||d.zn.length>80)return;
+  if(d.y!==undefined&&(!Number.isFinite(d.y)||d.y<0||d.y>32))return;
+  if(['vx','vz','vy','q','tm'].some(k=>d[k]!==undefined&&!Number.isFinite(d[k])))return;
+  p.motion=p.motion||W.motion.remote();if(!W.motion.push(p.motion,d,performance.now()))return;
+  p.world=typeof d.world==='string'?d.world.slice(0,80):'';p.tx=d.x;p.tz=d.z;p.f=d.f;p.zn=d.zn;p.ry=d.ry;p.sit=!!d.s;
+  if(p.first||p.motion.teleported){p.first=false;p.av.g.position.set(d.x,(d.f-1)*FH+(d.y||0),d.z);p.av.body.rotation.y=d.ry;p.motion.teleported=false}
+ }
+ else if(d.t==='c'){if(typeof d.m!=='string'||d.m.length>200||d.room&&(d.room!==W.me.zone||p.zn!==d.room))return;msg(p.name+(d.room?' · この部屋':''),d.m);p.av.say(d.m.slice(0,60));if(!chat.classList.contains('open')){unread++;$('unread').textContent=unread>9?'9+':unread;$('unread').hidden=false}}
  else if(d.t==='dr'){const target=W.doors[d.z]?.room;if(!target||target.k==='private'&&IDS[target.own]!==p.id)return;W.setDoor(d.z,!!d.c,true);const r=W.doors[d.z]&&W.doors[d.z].room;if(r)msg('',p.name+' が'+r.n+'のドアを'+(d.c?'閉めました':'開けました'),'sys')}
  else memberHandlers.forEach(fn=>fn(p,d));
 }
@@ -59,30 +66,36 @@ function drop(id,c){const p=peers.get(id);if(!p||p.conn!==c)return;peers.delete(
 const calls=new Map(),vc=new Map();
 function ctxInit(){ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume()}
 ['pointerdown','keydown','touchend'].forEach(e=>addEventListener(e,()=>{if(ctx&&ctx.state==='suspended')ctx.resume()},{passive:true}));
-function voiceIn(pid,s){ctxInit();voiceOut(pid);const el=new Audio();el.srcObject=s;el.muted=true;el.play().catch(()=>{});const src=ctx.createMediaStreamSource(s),g=ctx.createGain();g.gain.value=0;src.connect(g);g.connect(ctx.destination);vc.set(pid,{g,el,src})}
-function voiceOut(pid){const v=vc.get(pid);if(!v)return;try{v.src.disconnect();v.g.disconnect()}catch(e){}v.el.srcObject=null;vc.delete(pid)}
+function voiceIn(pid,s){ctxInit();voiceOut(pid);const el=new Audio();el.srcObject=s;el.muted=true;el.play().catch(()=>{});const src=ctx.createMediaStreamSource(s),g=ctx.createGain(),analyser=ctx.createAnalyser();analyser.fftSize=256;g.gain.value=0;src.connect(analyser);analyser.connect(g);g.connect(ctx.destination);vc.set(pid,{g,el,src,analyser,data:new Uint8Array(256)})}
+function voiceOut(pid){const v=vc.get(pid);if(!v)return;try{v.src.disconnect();v.analyser.disconnect();v.g.disconnect()}catch(e){}v.el.srcObject=null;vc.delete(pid)}
 function callPeer(p){if(!stream||!peer||calls.has(p.pid))return;const c=peer.call(p.pid,stream);calls.set(p.pid,c);c.on('close',()=>calls.delete(p.pid))}
 function micUI(on){$('bMic').classList.toggle('on',on);$('bMic').firstChild.textContent=on?'mic':'mic_off';const r=document.getElementById('rbMic');if(r)r.classList.toggle('on',on)}
 async function mic(on){
  if(on){if(stream||micPending)return;micPending=true;try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}catch(e){W.toast('マイクを使えませんでした（HTTPSと許可設定を確認）');return}finally{micPending=false}
-  ctxInit();peers.forEach(callPeer);micUI(true);W.toast('マイクON：近くの人に声が届きます')}
+  stream.getAudioTracks().forEach(t=>t.onended=()=>{mic(false);W.toast('マイクの接続が終了しました')});ctxInit();peers.forEach(callPeer);micUI(true);W.toast('マイクON：近くの人に声が届きます')}
  else{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;calls.forEach(c=>{try{c.close()}catch(e){}});calls.clear();micUI(false)}
 }
 $('bMic').onclick=()=>mic(!stream);
 const VR=24;
-function vol(p){if((p.world||'')!==(W.customWorld||''))return 0;const m=W.me,g=p.av.g.position;let d=Math.hypot(g.x-m.x,g.z-m.z)+Math.abs(p.f-m.f)*8;
+function vol(p){if((p.world||'')!==(W.customWorld||''))return 0;const m=W.me,g=p.av.g.position;let d=Math.hypot((Number.isFinite(p.tx)?p.tx:g.x)-m.x,(Number.isFinite(p.tz)?p.tz:g.z)-m.z)+Math.abs(p.f-m.f)*8;
  if(p.zn!==m.zone){const a=W.doors[p.zn],b=W.doors[m.zone];if((a&&a.closed)||(b&&b.closed))return 0}
  return d>=VR?0:Math.pow(1-d/VR,1.3)}
+// Audio proximity keeps updating when the browser pauses background animation frames.
+const voiceTimer=setInterval(()=>{peers.forEach(p=>{if(!p.av)return;const v=vc.get(p.pid);if(!v||!ctx){p.av.setSpeaking(false);return}const gain=deafen||muted.has(p.pid)||blocked.has(p.pid)?0:vol(p)*voiceVolume;v.g.gain.setTargetAtTime(gain,ctx.currentTime,.1);v.analyser.getByteTimeDomainData(v.data);const rms=Math.sqrt(v.data.reduce((sum,n)=>sum+((n-128)/128)**2,0)/v.data.length);p.av.setSpeaking(gain>.01&&rms>.025)})},100);
+addEventListener('beforeunload',()=>clearInterval(voiceTimer));
 /* ---- per-frame: broadcast own state, interpolate remotes, voice gains, ring ---- */
-let acc=0,hb=0,last='';
+let acc=0,hb=0,last='',motionSequence=0;
 W.onTick.push(dt=>{
  acc+=dt;hb+=dt;const m=W.me;
- if(acc>=.1){acc=0;const s=JSON.stringify({t:'p',x:+m.x.toFixed(2),z:+m.z.toFixed(2),f:m.f,ry:+m.ry.toFixed(2),zn:m.zone,s:m.sit?1:0,world:W.customWorld||''});if(s!==last||hb>1){last=s;hb=0;send(JSON.parse(s))}}
- const k=1-Math.exp(-dt*10);
- peers.forEach(p=>{if(!p.av||p.first)return;p.av.g.visible=!blocked.has(p.pid)&&(p.world||'')===(W.customWorld||'');const g=p.av.g.position;g.x+=(p.tx-g.x)*k;g.z+=(p.tz-g.z)*k;g.y=(p.f-1)*FH;p.av.body.rotation.y=p.ry;p.av.body.position.y=p.sit?-.32:0;
-  const v=vc.get(p.pid);if(v&&ctx)v.g.gain.setTargetAtTime(deafen||muted.has(p.pid)||blocked.has(p.pid)?0:vol(p)*voiceVolume,ctx.currentTime,.1)});
-
+ if(acc>=.1){acc=0;const s=JSON.stringify({t:'p',x:+m.x.toFixed(2),z:+m.z.toFixed(2),f:m.f,ry:+m.ry.toFixed(3),y:+m.y.toFixed(3),g:m.grounded?1:0,vx:+m.vx.toFixed(2),vz:+m.vz.toFixed(2),vy:+m.vy.toFixed(2),zn:m.zone,s:m.sit?1:0,world:W.customWorld||''});if(s!==last||hb>1){last=s;hb=0;send({...JSON.parse(s),q:++motionSequence,tm:performance.now()})}}
+ const k=1-Math.exp(-dt*18);
+ peers.forEach(p=>{if(!p.av||p.first||!p.motion)return;p.av.g.visible=!blocked.has(p.pid)&&(p.world||'')===(W.customWorld||'');
+  const pose=W.motion.sample(p.motion,performance.now());if(!pose)return;const g=p.av.g.position;
+  g.x+=(pose.x-g.x)*k;g.z+=(pose.z-g.z)*k;g.y+=((pose.f-1)*FH+pose.y-g.y)*k;
+  p.av.body.rotation.y=W.motion.angle(p.av.body.rotation.y,pose.ry,k);p.av.body.position.y=pose.s?-.32:0;p.av.sitting=!!pose.s;p.av.airborne=Math.abs(pose.vy||0)>.2;p.stale=pose.stale;
+ });
 });
+
 /* ---- HUD ring (items around the avatar) ---- */
 const ring=$('ring');
 [['mic','🎙',()=>mic(!stream)],['👋','👋',()=>emote('👋')],['😄','😄',()=>emote('😄')],['👍','👍',()=>emote('👍')],['❤','❤️',()=>emote('❤️')]].forEach(([id,t,f])=>{const b=document.createElement('button');b.className='rb';b.textContent=t;if(id==='mic')b.id='rbMic';b.onclick=f;ring.appendChild(b)});

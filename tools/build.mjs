@@ -13,9 +13,11 @@ const safe=s=>s.replace(/<\//g,'<\\/');
 const ids=JSON.parse(read('tools/accounts.json'));
 const path=resolve(root,'tools/secrets.local.json');
 const secrets=existsSync(path)?JSON.parse(readFileSync(path,'utf8')):{datakey:randomBytes(32).toString('base64'),passwords:{}};
-const reset=process.argv.includes('--reset');
+const resetAt=process.argv.indexOf('--reset');
+const resetIds=resetAt<0?[]:process.argv.slice(resetAt+1);
+if(resetAt>=0&&(!resetIds.length||resetIds.some(id=>!ids.includes(id))))throw Error('Use --reset followed by valid account IDs');
 let changed=false;
-for(const id of ids)if(!secrets.passwords[id]||reset){secrets.passwords[id]=randomBytes(16).toString('base64url');changed=true;}
+for(const id of ids)if(!secrets.passwords[id]||resetIds.includes(id)){secrets.passwords[id]=randomBytes(16).toString('base64url');changed=true;}
 writeFileSync(path,JSON.stringify(secrets,null,2));
 const key=Buffer.from(secrets.datakey,'base64'),n=600000;
 function encrypt(key,iv,data){const cipher=createCipheriv('aes-256-gcm',key,iv);return Buffer.concat([cipher.update(data),cipher.final(),cipher.getAuthTag()]).toString('base64');}
@@ -23,7 +25,7 @@ const member=read('src/member.js').replace('@@IDS@@',JSON.stringify(ids)).replac
 const bi=randomBytes(12);
 const enc={n,u:ids.map(id=>{const salt=randomBytes(16),iv=randomBytes(12);return {h:createHash('sha256').update('cc:'+id.toLowerCase()).digest('hex').slice(0,16),s:salt.toString('base64'),i:iv.toString('base64'),d:encrypt(pbkdf2Sync(secrets.passwords[id],salt,n,32,'sha256'),iv,key)};}),bi:bi.toString('base64'),b:encrypt(key,bi,Buffer.from(member))};
 let html=read('src/index.template.html');
-const replacements={'@@ENC@@':JSON.stringify(enc),'@@CFG@@':safe(read('config.json')),'@@WORLD@@':safe(read('src/world.js')),'@@EXPERIENCE@@':safe(read('src/experience.js')),'@@AUTH@@':safe(read('src/auth.js')),'@@STYLE@@':read('src/style.css')};
+const replacements={'@@ENC@@':JSON.stringify(enc),'@@CFG@@':safe(read('config.json')),'@@MOTION@@':safe(read('src/motion.js')),'@@ATMOSPHERE@@':safe(read('src/atmosphere.js')),'@@DETAILS@@':safe(read('src/details.js')),'@@ICONS@@':safe(read('src/icons.js')),'@@WORLD@@':safe(read('src/world.js')),'@@EXPERIENCE@@':safe(read('src/experience.js')),'@@AUTH@@':safe(read('src/auth.js')),'@@STYLE@@':read('src/style.css')};
 for(const [token,value] of Object.entries(replacements))html=html.replace(token,()=>value);
 if(/@@[A-Z]+@@/.test(html))throw Error('Unresolved build token');
 writeFileSync(resolve(root,'index.html'),html);

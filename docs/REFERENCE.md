@@ -1,68 +1,119 @@
 # 開発リファレンス
 
-## 構成
-```
-src/index.template.html  HTML+CSS（UI）。@@ENC@@ @@CFG@@ @@WORLD@@ @@AUTH@@ を build.py が埋め込む
-src/world.js             公開層: 描画・街・建物・操作・アバター。グローバル `W`（API）を作る
-src/auth.js              ログイン: ID+パスワードで暗号化済み member.js を解錠して実行
-src/member.js            **暗号化層**: ネットワーク/VC/チャット/HUDリング/ドア同期/設定
-tools/build.py           ビルド＆暗号化 → ルートに index.html
-tools/accounts.json      アカウントID一覧（順序が個人部屋の持ち主=index）
-config.json              イベント・GitHub/シート・PeerJS/ICE 設定（build時に埋込）
-tests/smoke.js           jsdom+three(スタブ描画)での起動・ログイン・エレベーター・ドアの煙テスト
-```
-`index.html` は生成物（コミットして Pages で配信）。編集は必ず `src/` で行い build する。
+## 構成とビルド
 
-## 認証（auth.js / build.py）
-- 乱数の**データ鍵**（`secrets.local.json` の `datakey`、固定）で `member.js` を AES-GCM 暗号化 → `ENC.b`
-- ユーザーごとに PBKDF2(password, salt, 600000) で鍵を作り、データ鍵を AES-GCM でラップ → `ENC.u[]`（`h` = sha256("cc:"+小文字ID) の先頭16桁）
-- ログイン: IDハッシュで該当ユーザー検索 → 解錠 → `new Function('W', async本体)` で member.js 実行（`return true` が成功）
-- ルーム名キー `W.roomKey` = sha256(データ鍵) 先頭16桁。同期の PeerJS ID 接頭辞に使う
-- パスワードは端末の localStorage `cc_auth` に保存（自動ログイン）。ログアウトで削除
+- `src/index.template.html`: HTMLとビルド用プレースホルダー。
+- `src/style.css`: PC/タッチ/狭い画面向けのUI、フォーカス・動きを抑える設定。
+- `src/icons.js`: フォント配信に依存しないSVGアイコン。
+- `src/world.js`: 描画、街・建物、衝突、カメラ、移動、ドア、アバター。公開層。
+- `src/motion.js`: FPSに依存しない垂直移動と、遅延バッファ/短時間の予測/角度補間の純粋関数。
+- `src/atmosphere.js`: HTTP Dateの共通時計、太陽/空/星/月、UIテーマとGoogle Fonts。
+- `src/details.js`: 手続き型PBR素材、建築/家具、静的部品のインスタンス化と境界。
+- `src/experience.js`: 探索、ミニマップ、初回案内、設定、照明、合成環境音。公開層。
+- `src/auth.js`: 暗号の解錠、ログイン、ゲスト入室。
+- `src/member.js`: PeerJSメッシュ、近接通話、チャット、ドア同期。
+- `src/facilities.js`: 部屋機能、共有、ゲーム、個人設定、空間JSON。member.jsの中に挿入され、**まとめて暗号化**されます。
+- `tools/build.mjs`: Node標準暗号APIによるビルド。`tools/build.py` は互換用の転送先。
+- `tools/prepare-pages.mjs`: 配信するファイルの許可リスト。CIでは暗号鍵を生成しません。
+- `vendor/`: 固定バージョンのthree r128 / PeerJS 1.5.4 / GLTFLoaderとライセンス。ビルド時にnode_modulesからコピー。
+- `tests/smoke.js`: jsdom + 実threeオブジェクト + 模擬WebRTCメッシュの統合テスト。
+- `tests/visual.cjs`: 実ブラウザーの3D・レスポンシブ画面・実WebRTCの検証。画像はgitignore済みartifactsへ。
 
-## 世界 API（`W`, world.js 末尾）
-| 名前 | 内容 |
+生成された `index.html` を直接編集しないでください。`npm ci && npm run build` の後に `npm test` を実行します。
+
+## 暗号
+
+元のエンベロープ形式を維持しています。32バイトの固定データ鍵でメンバー層全体をAES-256-GCM暗号化し、ユーザーごとのパスワードからPBKDF2-SHA256（60万回）で作った鍵でデータ鍵をラップします。IVは12バイト、saltは16バイトでビルドごとに乱数生成します。
+
+ユーザー検索キーはsha256(`cc:`+小文字ID)の先頭16桁です。解錠後のデータ鍵ハッシュの先頭16桁を同期名に使います。ログイン情報の端末保存はチェックボックスで明示的に選んだ場合だけです。
+
+`tools/secrets.local.json` は公開しないでください。公開成果物は `_site/index.html`、`_site/vendor/`、`_site/worlds/`、`_site/data/` だけです。ソースの暗号化は身内向けの簡易保護で、サーバーが強制する認証・権限ではありません。
+
+## 世界API W
+
+| API | 内容 |
 |---|---|
-| `W.THREE / S / FH` | three.js / シーン / 1階の高さ(5) |
-| `mat(color,opts)` `bx(w,h,d,x,y,z,mat,parent,{cast,recv})` | 材質キャッシュ / ボックス生成 |
-| `rect(f,cx,cz,w,d,{on})` | 衝突 AABB を階 f に登録 |
-| `act(f,x,z,r,label|fn,fn)` | 近接アクション（ボタン/Eキー）。label が関数なら動的、空文字なら非表示 |
-| `label(text,{h,bg,fg})` / `setLabel` | テキストスプライト |
-| `makeAvatar(name,color)` | `{g,body,plate,setName,setColor,setImage(url),say(t),dispose()}` |
-| `local` | 自分のアバター / `me` = `{x,z,f,ry,zone,sit}` |
-| `go(building,floor)` | エレベーター移動 |
-| `doors[zone]`, `setDoor(zone,closed,silent)` | ドア状態。silent=true は通知なし（リモート反映用） |
-| `rooms[]` | `{b,f,s,k,n,own,zone,x0,x1,z0,z1,cx,cz}` |
-| `roomHandlers[kind]=fn(room)` | 部屋の機能を差し込む口（未設定なら案内ポップアップ） |
-| `pop(html,title)` `toast(t)` `closePop()` | UI |
-| `onTick[]` | 毎フレーム `fn(dt)`。`canToggle / onDoorChange / onKnock / onZone` はフック |
+| `THREE`, `S`, `FH`, `renderer` | ライブラリ、シーン、階高5m、描画器 |
+| `mat`, `bx`, `rect` | 材質キャッシュ、箱メッシュ、階別AABB衝突 |
+| `act(f,x,z,r,label,fn)` | 近接操作。labelは動的関数も可 |
+| `label`, `setLabel` | スプライトの文字表示 |
+| `makeAvatar(name,color)` | 名前、色、画像、吹き出し、dispose |
+| `local`, `me` | 自分のアバターと `{x,z,f,ry,zone,sit}` |
+| `go(building,floor)` | エレベーター付近への移動 |
+| `navigate(room?)` | 探索から移動。施錠を確認し、追加空間を出る。省略すると中央庭園 |
+| `doors`, `setDoor(zone,closed,silent)` | ドア状態。silentはリモート反映 |
+| `rooms`, `BD`, `roomInfo` | 部屋・建物・部屋の説明 |
+| `roomHandlers[kind](room)` | メンバー専用部屋の操作 |
+| `pop(html,title)`, `closePop()` | ダイアログ。焦点を戻し、背景の移動を停止 |
+| `setPopCleanup(fn)` | 別のダイアログを開く/閉じる際のタイマーや映像表示の片付け |
+| `onTick[]` | 毎フレームのコールバック |
+| `canToggle`, `onDoorChange`, `onKnock`, `onZone` | ドア/ゾーンのフック |
+| `storage.get/set`, `prefs`, `applyPrefs` | 安全な端末保存、描画/音量/昼夜など |
+| `explore`, `help`, `openPreferences` | 共通UI |
+| `showWorlds`, `leaveCustomWorld`, `customWorld` | 追加空間への入退出 |
+| `setAvatarModel(avatar,url)` | GLBを検証・読み込み・身長調整 |
 
-## 空間データ（world.js）
-- 建物 `BD`: `{id,n,x,z,fl(階数),door(入口の向き w/e/n/s),col,rooms:[[階,slot,kind,名前,own?]]}`
-- 建物内は**ローカル座標**（入口が -z 側）で記述し、`w2()` で向きに応じて回転。部屋 slot 0–5 = 左3/右3（`SL` 表）
-- 階ごとに `b.G[f]` グループ。屋内にいるときは自分の階より上のグループを非表示、外壁は半透明化
-- 部屋 kind: pc / multi / smash / game / library / count / private / creative（色は `RC`、案内文は `INFO`）
-- ゾーン ID: 屋外 `out`、廊下 `E2`、部屋 `E2-0`
+ダイアログに外部入力を表示するときは `W.esc` または `textContent` を使います。リンクはHTTPSまたは同一originのみ。共有JSONからJavaScriptは実行しません。
 
-## ドアとボイスのルール
-- ドアを閉めると、その部屋ゾーンは閉鎖。自分か相手のどちらかが閉鎖ゾーンにいて**ゾーンが違う**場合、声の音量は 0
-- 同ゾーン同士・開放ゾーン同士は距離減衰（最大 24m、階違いは 1 階 = 8m 加算）
-- 個人部屋（kind=private）は `IDS[own]` の持ち主だけが開閉可。他の人は「ノック」が全員に通知される
-- 閉鎖状態は `dr` メッセージで同期（最後に操作した人が勝つ）。参加時の `hi` で現在の閉鎖一覧を共有
+## 街の座標と描画
 
-## 同期プロトコル（member.js, PeerJS DataChannel）
-接続: ID `cclass-<roomKey>-<slot0..15>`。起動時に空き slot を取り、**自分より大きい slot** に 5 秒ごとに接続（片方向開始で重複回避）。
-| t | 内容 |
+館 `BD` は `{id,n,x,z,fl,door,col,rooms}`。建物内はローカル座標（入口が-z）で定義し `w2()` で回転します。部屋slotは左3/右3。ゾーンIDは屋外 `out`、廊下 `E2`、部屋 `E2-0`、追加空間 `world:<id>` です。
+
+静的な箱は階・材質・影の設定別にInstancedMeshへまとめます。ドアとアバターは個別の可動メッシュです。**初期化時の静的箱は元のMeshを後で動かさない**でください。後から追加するターゲットやプレビューは一括化の対象外です。
+
+移動は0.15m以下の刻みに分割して衝突判定します。カメラは同階の衝突箱で遮られ、屋内では天井より下に制限します。パネル・ログイン中・非表示タブでは移動しません。blurとvisibilitychangeで押されたキーとスティックを解除します。
+
+## ネットワーク
+
+Peer IDは `cclass-<roomKey>-<slot 0..15>`。各参加者は空きslotを取り、自分より大きいslotへ5秒ごとに接続します。16接続までのメッシュです。
+
+| t | 主なフィールド |
 |---|---|
-| `hi` | `{id,name,col,av(webp dataURL),dr[閉鎖ゾーン]}` 接続直後・設定変更時 |
-| `p` | `{x,z,f,ry,zn,s}` 0.1 秒ごと（変化なしなら 1 秒ハートビート） |
-| `c` | `{m}` チャット/吹き出し/絵文字 |
-| `dr` | `{z,c}` ドア開閉 |
-音声は `peer.call()`（マイクON時のみ発信、受信は常時）→ WebAudio の GainNode で近接音量。
-上限 16 同時接続。NAT が厳しい環境は `config.json` の `ice` に TURN を、自前ブローカーは `peer` に `{host,port,path,secure}` を指定。
+| `hi` | id, name, col, av（画像dataURL）, glb, dr, minutes |
+| `p` | x, z, f, ry, zn, s, world, y, g, vx, vz, vy, q, tm（0.1秒ごと、静止時1秒） |
+| `c` | m, room（nullなら全体、ゾーンIDならその部屋） |
+| `dr` | z, c（privateは接続側の名乗ったIDと持ち主を照合） |
+| `file-offer` | id, name, size |
+| `file-accept` | id（明示的に許可した受信者だけ） |
+| `file-chunk` | id, offset, data（16,000バイト以内） |
+| `file-end` | id（合計サイズが一致したら保存ボタンを表示） |
+| `game-sync` / `game-move` | zone, index, reset |
+| `game-state` | zone, state（選出ホストのスナップショットのみ） |
+| `game-rps` / `game-rps-reset` | zone, choice |
+| `game-dice` | zone, value |
 
-## 拡張の手順
-- 新しい部屋: `BD[].rooms` に `[階,slot,kind,名前]` を足し、`W.roomHandlers[kind]` を member.js で実装
-- 新しい建物: `BD` に追加（道路・入口は `DIRS` と座標を合わせる）
-- 新しいメッセージ: member.js の `onData` と `send` に `t` を追加（互換のため未知の `t` は無視される）
-- 公開側（ゲストでも見える物）は world.js、メンバー専用の機能は member.js に書く
+着信データには文字数・座標・型・画像サイズ・送信頻度の上限を設けています。未知のtは無視します。ファイル受信は最大20MB、同時8件まで。2分進捗がなければ破棄し、自動で端末に保存しません。
+
+通話はマイクをONにした場合だけ発信します。相手のGainNodeに距離減衰（最大24m、階差1階につき8m）を適用し、閉じた部屋の外、別の追加空間、ミュート/ブロックした人の音は消します。ブロックは端末内だけで、サーバーのBANではありません。
+
+画面共有は別のMediaConnectionで `{kind:'screen',room}` をmetadataに付けます。同室の既知メンバーからだけ応答し、VideoTextureとパネルのvideoに表示します。送信者/受信者が退出したら映像を片付けます。音声共有は行いません。
+
+## 空間ファイル
+
+```json
+{
+  "version": 1,
+  "name": "小さな部屋",
+  "objects": [
+    {"type":"box","pos":[0,0.5,-3],"size":[1,1,1],"color":"#8ea77b"}
+  ]
+}
+```
+
+typeはbox/sphere/cylinder。posは中心座標、sizeは幅/高さ/奥行。座標x,zは±90、yは0〜30、各サイズは0.1〜20、色は6桁HEX、最大150個です。低い床以外は地上で衝突します。中心近くが出現地点になるので、`[0,0,9]` 付近には大きな物体を置かないでください。
+
+JSONインポートは200KBまで。GLBアバターは10MBまで、外部リソースを参照しないものを使います。Draco/KTX2など追加デコーダーが必要な拡張やVRM固有の表情は対象外です。
+
+## 2.1の移動と補間
+
+`W.me.y` はその階の床からの相対高さ、`vy` は垂直速度、`grounded` は接地、`vx/vz` は実移動速度。`W.jump()` は操作可能で接地中の場合だけtrueを返します。`W.resetMotion()` は移動先の初期化、`W.faceDirection(yaw)` は入室時の視点合わせです。
+
+`rect` には `y0/y1`（階からの高さ）と `standable` を追加しました。プレイヤーの高さは1.8m。カメラの箱判定も実際のy0/y1を使います。床・家具の上面への着地は1/120秒以下の刻みで評価します。ジャンプ初速6.2m/s、重力18m/s²。通常ジャンプの頂点は約1.05mです。
+
+位置パケットの `tm` は送信側の単調時計、`q` は接続ごとの連番、`y` は相対高さ、`g` は接地フラグ、`vx/vz/vy` は速度です。`W.motion` の `remote/push/sample` が受信時刻と送信間隔からジッターを見積もり、遅延バッファと限定的な外挿を行います。両端の端末時計が一致している必要はありません。過去/重複番号は無視し、階・worldの変化と14m超の移動はテレポート扱いです。
+
+`W.clock.now()/format()/sync()` が共通時計、`W.solarAt(epoch)` が時刻だけで決まる照明パラメーターです。HTTP Dateを受け取った時点でRTTと秒精度を補正し、その後はperformance.nowで進めます。取得失敗時に偽の同期済み表示はしません。`config.json` の `worldTimeZone` は運営者共通の設定です。
+
+`W.prefs.theme/uiMode/font` は端末別のUI設定。旧 `prefs.time` は移行時に削除します。`W.applyTheme()` で全UIと空間ラベルの書体を更新します。星や空のような環境メッシュには `userData.environment` を付け、追加空間でも表示を維持します。
+
+描画検証は `npm test` の物理/補間と複数人統合テスト、`npm run test:browser` の実ブラウザー・共通時計・テーマ・PC/スマホ表示、`npm run test:deployment` の公開対象検証に分かれます。`W.renderPaused` は画面検証で非操作中の描画負荷を止めるためのフラグです。通常は未設定です。

@@ -1,16 +1,20 @@
 {
   "name": "cclass-vspace",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node tests/smoke.js",
-    "serve": "python -m http.server 8080"
+    "test": "node tests/motion.cjs && node tests/smoke.js",
+    "serve": "node tools/serve.mjs",
+    "test:browser": "node tests/visual.cjs",
+    "pages": "node tools/prepare-pages.mjs",
+    "test:deployment": "node tests/deployment.mjs",
+    "test:shortcuts": "node tests/shortcut.cjs"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
     "jsdom": "22.1.0",
-    "peerjs": "^1.5.4",
+    "peerjs": "1.5.4",
     "three": "0.128.0"
   }
 }

@@ -1,9 +1,14 @@
 {
-  "events": [
-    {"d": "準備中", "t": "イベント情報はここに表示されます（config.json の events を編集して build.py を実行）"}
-  ],
-  "github": {"owner": "", "repo": "", "branch": "main"},
+  "events": [],
+  "github": {
+    "owner": "",
+    "repo": "",
+    "branch": "main"
+  },
   "sheetId": "1UAiWmQ7JgV5tZPWA_sDZhVnlhiqntx4fDCe9OWLF0C4",
   "peer": {},
-  "ice": null
+  "ice": null,
+  "apps": [],
+  "tenants": [],
+  "worldTimeZone": "Asia/Tokyo"
 }
