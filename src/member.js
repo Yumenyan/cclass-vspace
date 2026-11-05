@@ -4,12 +4,12 @@ const IDS=@@IDS@@;
 const myId=IDS.find(x=>x.toLowerCase()===W.id.toLowerCase())||W.id;W.id=myId;
 const $=W.$,LS=localStorage,FH=W.FH;
 const CFG=window.CC_CONFIG||{};
-const muted=new Set(),blocked=new Set();let deafen=false,voiceVolume=1,unread=0;const memberHandlers=[];
+const muted=new Set();let deafen=false,voiceVolume=1,unread=0;const memberHandlers=[];
 const st={name:LS.getItem('cc_name_'+myId)||myId,color:+(LS.getItem('cc_col_'+myId)||0x4c8bf5),av:LS.getItem('cc_av_'+myId)||''};
 const meAv=W.local;meAv.setName(st.name);meAv.setColor(st.color);if(st.av)meAv.setImage(st.av);
 /* ---- chat ---- */
 const log=$('log');
-function msg(n,t,cls){const d=document.createElement('div');d.className='m '+(cls||'');if(n){const b=document.createElement('b');b.textContent=n;d.appendChild(b)}const time=document.createElement('time');time.textContent=W.clock?W.clock.time():new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});d.appendChild(time);const s=document.createElement('span');s.textContent=t;d.appendChild(s);log.appendChild(d);log.scrollTop=log.scrollHeight;while(log.children.length>150)log.firstChild.remove()}
+function msg(n,t,cls,author){const d=document.createElement('div');d.className='m '+(cls||'');if(author){d.dataset.author=author;d.hidden=policy(author).chat==='none'}if(n){const b=document.createElement('b');b.textContent=n;d.appendChild(b)}const time=document.createElement('time');time.textContent=W.clock?W.clock.time():new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});d.appendChild(time);const s=document.createElement('span');s.textContent=t;d.appendChild(s);log.appendChild(d);log.scrollTop=log.scrollHeight;while(log.children.length>150)log.firstChild.remove()}
 const chat=$('chat');
 $('bChat').onclick=()=>{unread=0;$('unread').hidden=true;chat.classList.toggle('open');$('welcome').hidden=true;$('bChat').classList.toggle('on',chat.classList.contains('open'))};
 $('chatClose').onclick=()=>{chat.classList.remove('open');$('bChat').classList.remove('on')};
@@ -18,11 +18,11 @@ $('cs').onclick=sendChat;$('ci').onkeydown=e=>{if(e.key==='Enter')sendChat()};
 msg('','ようこそ、'+st.name+' さん','sys');
 /* ---- network: serverless mesh over PeerJS public broker, rooms namespaced by a key only members can derive ---- */
 const NS='cclass-'+W.roomKey,MAXS=16,peers=new Map();
-let micPending=false;let peer=null,mySlot=-1,stream=null,ctx=null,scanT=null;
+let micPipeline=null,micGeneration=0;let micPending=false;let peer=null,mySlot=-1,stream=null,ctx=null,scanT=null;
 const PO=Object.assign({},CFG.peer||{});if(CFG.ice)PO.config={iceServers:CFG.ice};
 function setNet(s){const e=$('stat');e.dataset.s=s;$('statt').textContent={wait:'接続中…',ok:'オンライン',full:'満室（同時接続上限）',err:'接続エラー'}[s]||s}
 const closedList=()=>Object.keys(W.doors).filter(z=>W.doors[z].closed);
-const hello=()=>({t:'hi',id:myId,name:st.name,col:st.color,av:st.av,glb:st.glb||'',dr:closedList(),minutes:Math.floor((performance.now()-joinedAt)/60000)});const joinedAt=performance.now();
+const hello=()=>({t:'hi',id:myId,name:st.name,col:st.color,av:st.av,glb:st.glb||'',dr:closedList(),noEntry:deniedEntries(),minutes:Math.floor((performance.now()-joinedAt)/60000)});const joinedAt=performance.now();
 function send(m){peers.forEach(p=>{try{if(p.conn.open)p.conn.send(m)}catch(e){}})}
 function updPC(){$('pc').textContent=peers.size+1}
 function startPeer(s){
@@ -41,13 +41,13 @@ function link(c){
   peers.set(id,{pid:id,conn:c,av:null,name:'?',x:0,z:0,f:1,zn:'out',ry:0,sit:false,first:true});c.send(hello());updPC()});
  c.on('data',d=>onData(id,c,d));c.on('close',()=>drop(id,c));c.on('error',()=>drop(id,c));
 }
-function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!=='object'||typeof d.t!=='string'||blocked.has(id))return;
+function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!=='object'||typeof d.t!=='string')return;
  if(!p.rateAt||Date.now()-p.rateAt>1000){p.rateAt=Date.now();p.rate=0}if(++p.rate>100)return;
  if(d.t==='hi'&&(typeof d.name!=='string'||d.name.length>32||typeof d.id!=='string'||!IDS.includes(d.id)))return;
- if(d.t==='hi'){const first=!p.av;p.name=d.name;p.id=d.id;p.minutes=Math.max(0,Math.min(100000,Number(d.minutes)||0));if(first){p.av=W.makeAvatar(d.name,d.col);p.av.g.position.set(p.x,0,p.z)}else{p.av.setName(d.name);p.av.setColor(d.col)}
+ if(d.t==='hi'){const first=!p.av;p.name=d.name;p.id=d.id;receiveRestrictions(p.id,d.noEntry);p.minutes=Math.max(0,Math.min(100000,Number(d.minutes)||0));if(first){p.av=W.makeAvatar(d.name,d.col);p.av.g.position.set(p.x,0,p.z)}else{p.av.setName(d.name);p.av.setColor(d.col)}
   if(typeof d.av==='string'&&d.av.length<250000&&(!d.av||/^data:image\/(webp|png|jpeg);base64,/.test(d.av))&&p.avUrl!==d.av){p.avUrl=d.av;p.av.setImage(d.av||'')}
   if(Array.isArray(d.dr))d.dr.slice(0,100).forEach(z=>{const r=W.doors[z]?.room;if(r&&(r.k!=='private'||IDS[r.own]===p.id))W.setDoor(z,true,true)});if(typeof d.glb==='string'&&d.glb.length<2048&&W.setAvatarModel&&p.glb!==d.glb){p.glb=d.glb;W.setAvatarModel(p.av,d.glb)}
-  if(first){msg('',d.name+' が参加しました','sys');if(stream)callPeer(p);updPC()}}
+  p.av.g.visible=!policy(p).hideAvatar&&(p.world||'')===(W.customWorld||'');if(first){msg('',d.name+' が参加しました','sys',p.id);if(stream)callPeer(p);updPC()}}
  else if(!p.av)return;
  else if(d.t==='p'){
   if(![d.x,d.z,d.f,d.ry].every(Number.isFinite)||Math.abs(d.x)>118||Math.abs(d.z)>118||!Number.isInteger(d.f)||d.f<1||d.f>3||typeof d.zn!=='string'||d.zn.length>80)return;
@@ -57,23 +57,25 @@ function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!==
   p.world=typeof d.world==='string'?d.world.slice(0,80):'';p.tx=d.x;p.tz=d.z;p.f=d.f;p.zn=d.zn;p.ry=d.ry;p.sit=!!d.s;
   if(p.first||p.motion.teleported){p.first=false;p.av.g.position.set(d.x,(d.f-1)*FH+(d.y||0),d.z);p.av.body.rotation.y=d.ry;p.motion.teleported=false}
  }
- else if(d.t==='c'){if(typeof d.m!=='string'||d.m.length>200||d.room&&(d.room!==W.me.zone||p.zn!==d.room))return;msg(p.name+(d.room?' · この部屋':''),d.m);p.av.say(d.m.slice(0,60));if(!chat.classList.contains('open')){unread++;$('unread').textContent=unread>9?'9+':unread;$('unread').hidden=false}}
- else if(d.t==='dr'){const target=W.doors[d.z]?.room;if(!target||target.k==='private'&&IDS[target.own]!==p.id)return;W.setDoor(d.z,!!d.c,true);const r=W.doors[d.z]&&W.doors[d.z].room;if(r)msg('',p.name+' が'+r.n+'のドアを'+(d.c?'閉めました':'開けました'),'sys')}
- else memberHandlers.forEach(fn=>fn(p,d));
+ else if(d.t==='c'){if(policy(p).chat==='none')return;if(typeof d.m!=='string'||d.m.length>200||d.room&&(d.room!==W.me.zone||p.zn!==d.room))return;msg(p.name+(d.room?' · この部屋':''),d.m,'',p.id);if(policy(p).chat==='all')p.av.say(d.m.slice(0,60));W.sfx?.play('notify','world');if(!chat.classList.contains('open')){unread++;$('unread').textContent=unread>9?'9+':unread;$('unread').hidden=false}}
+ else if(d.t==='dr'){const target=W.doors[d.z]?.room;if(!target||target.k==='private'&&IDS[target.own]!==p.id)return;W.setDoor(d.z,!!d.c,true);const r=W.doors[d.z]&&W.doors[d.z].room;if(r)msg('',p.name+' が'+r.n+'のドアを'+(d.c?'閉めました':'開けました'),'sys',p.id)}
+ else if(!(d.t==='file-offer'&&policy(p).chat==='none'))memberHandlers.forEach(fn=>fn(p,d));
 }
-function drop(id,c){const p=peers.get(id);if(!p||p.conn!==c)return;peers.delete(id);if(p.av){p.av.dispose();msg('',p.name+' が退出しました','sys')}voiceOut(id);const cl=calls.get(id);if(cl){try{cl.close()}catch(e){}calls.delete(id)}updPC()}
+function drop(id,c){const p=peers.get(id);if(!p||p.conn!==c)return;peers.delete(id);if(p.av){p.av.dispose();msg('',p.name+' が退出しました','sys',p.id)}voiceOut(id);const cl=calls.get(id);if(cl){try{cl.close()}catch(e){}calls.delete(id)}updPC()}
 /* ---- voice ---- */
+@@VOICE@@
 const calls=new Map(),vc=new Map();
-function ctxInit(){ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume()}
+function ctxInit(){if(!ctx){const Audio=window.AudioContext||window.webkitAudioContext;try{ctx=new Audio({sampleRate:48000})}catch(_){ctx=new Audio()}}if(ctx.state==='suspended')ctx.resume();return ctx}
 ['pointerdown','keydown','touchend'].forEach(e=>addEventListener(e,()=>{if(ctx&&ctx.state==='suspended')ctx.resume()},{passive:true}));
 function voiceIn(pid,s){ctxInit();voiceOut(pid);const el=new Audio();el.srcObject=s;el.muted=true;el.play().catch(()=>{});const src=ctx.createMediaStreamSource(s),g=ctx.createGain(),analyser=ctx.createAnalyser();analyser.fftSize=256;g.gain.value=0;src.connect(analyser);analyser.connect(g);g.connect(ctx.destination);vc.set(pid,{g,el,src,analyser,data:new Uint8Array(256)})}
 function voiceOut(pid){const v=vc.get(pid);if(!v)return;try{v.src.disconnect();v.analyser.disconnect();v.g.disconnect()}catch(e){}v.el.srcObject=null;vc.delete(pid)}
-function callPeer(p){if(!stream||!peer||calls.has(p.pid))return;const c=peer.call(p.pid,stream);calls.set(p.pid,c);c.on('close',()=>calls.delete(p.pid))}
+function callPeer(p){if(!stream||!peer||calls.has(p.pid))return;const c=peer.call(p.pid,stream);calls.set(p.pid,c);c.on('close',()=>{if(calls.get(p.pid)===c)calls.delete(p.pid)})}
 function micUI(on){$('bMic').classList.toggle('on',on);$('bMic').firstChild.textContent=on?'mic':'mic_off';const r=document.getElementById('rbMic');if(r)r.classList.toggle('on',on)}
 async function mic(on){
- if(on){if(stream||micPending)return;micPending=true;try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}catch(e){W.toast('マイクを使えませんでした（HTTPSと許可設定を確認）');return}finally{micPending=false}
-  stream.getAudioTracks().forEach(t=>t.onended=()=>{mic(false);W.toast('マイクの接続が終了しました')});ctxInit();peers.forEach(callPeer);micUI(true);W.toast('マイクON：近くの人に声が届きます')}
- else{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;calls.forEach(c=>{try{c.close()}catch(e){}});calls.clear();micUI(false)}
+ if(on&&(stream||micPending))return;const generation=++micGeneration;
+ if(!on){micPending=false;$('bMic').disabled=false;if(micPipeline){micPipeline.cleanup();micPipeline=null}else if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;calls.forEach(c=>{try{c.close()}catch(_){}});calls.clear();micUI(false);return}
+ lastVoiceError='';micPending=true;$('bMic').disabled=true;stopVoiceTest();
+ try{ctxInit();const pipeline=await createVoicePipeline(voicePrefs);if(generation!==micGeneration){pipeline.cleanup();return}micPipeline=pipeline;stream=pipeline.stream;pipeline.raw.getAudioTracks().forEach(t=>t.onended=()=>{mic(false);W.toast('マイクの接続が終了しました')});peers.forEach(callPeer);micUI(true);W.toast('マイクON · '+pipeline.label)}catch(error){lastVoiceError=String(error?.message||error);if(generation===micGeneration)W.toast('マイクを使えませんでした。接続とブラウザーの許可設定を確認してください。')}finally{if(generation===micGeneration){micPending=false;$('bMic').disabled=false}}
 }
 $('bMic').onclick=()=>mic(!stream);
 const VR=24;
@@ -81,7 +83,7 @@ function vol(p){if((p.world||'')!==(W.customWorld||''))return 0;const m=W.me,g=p
  if(p.zn!==m.zone){const a=W.doors[p.zn],b=W.doors[m.zone];if((a&&a.closed)||(b&&b.closed))return 0}
  return d>=VR?0:Math.pow(1-d/VR,1.3)}
 // Audio proximity keeps updating when the browser pauses background animation frames.
-const voiceTimer=setInterval(()=>{peers.forEach(p=>{if(!p.av)return;const v=vc.get(p.pid);if(!v||!ctx){p.av.setSpeaking(false);return}const gain=deafen||muted.has(p.pid)||blocked.has(p.pid)?0:vol(p)*voiceVolume;v.g.gain.setTargetAtTime(gain,ctx.currentTime,.1);v.analyser.getByteTimeDomainData(v.data);const rms=Math.sqrt(v.data.reduce((sum,n)=>sum+((n-128)/128)**2,0)/v.data.length);p.av.setSpeaking(gain>.01&&rms>.025)})},100);
+const voiceTimer=setInterval(()=>{peers.forEach(p=>{if(!p.av)return;const v=vc.get(p.pid);if(!v||!ctx){p.av.setSpeaking(false);return}const gain=deafen||muted.has(p.pid)?0:vol(p)*voiceVolume*policy(p).volume;v.g.gain.setTargetAtTime(gain,ctx.currentTime,.1);v.analyser.getByteTimeDomainData(v.data);const rms=Math.sqrt(v.data.reduce((sum,n)=>sum+((n-128)/128)**2,0)/v.data.length);p.av.setSpeaking(gain>.01&&rms>.025)})},100);
 addEventListener('beforeunload',()=>clearInterval(voiceTimer));
 /* ---- per-frame: broadcast own state, interpolate remotes, voice gains, ring ---- */
 let acc=0,hb=0,last='',motionSequence=0;
@@ -89,7 +91,7 @@ W.onTick.push(dt=>{
  acc+=dt;hb+=dt;const m=W.me;
  if(acc>=.1){acc=0;const s=JSON.stringify({t:'p',x:+m.x.toFixed(2),z:+m.z.toFixed(2),f:m.f,ry:+m.ry.toFixed(3),y:+m.y.toFixed(3),g:m.grounded?1:0,vx:+m.vx.toFixed(2),vz:+m.vz.toFixed(2),vy:+m.vy.toFixed(2),zn:m.zone,s:m.sit?1:0,world:W.customWorld||''});if(s!==last||hb>1){last=s;hb=0;send({...JSON.parse(s),q:++motionSequence,tm:performance.now()})}}
  const k=1-Math.exp(-dt*18);
- peers.forEach(p=>{if(!p.av||p.first||!p.motion)return;p.av.g.visible=!blocked.has(p.pid)&&(p.world||'')===(W.customWorld||'');
+ peers.forEach(p=>{if(!p.av||p.first||!p.motion)return;p.av.g.visible=!policy(p).hideAvatar&&(p.world||'')===(W.customWorld||'');
   const pose=W.motion.sample(p.motion,performance.now());if(!pose)return;const g=p.av.g.position;
   g.x+=(pose.x-g.x)*k;g.z+=(pose.z-g.z)*k;g.y+=((pose.f-1)*FH+pose.y-g.y)*k;
   p.av.body.rotation.y=W.motion.angle(p.av.body.rotation.y,pose.ry,k);p.av.body.position.y=pose.s?-.32:0;p.av.sitting=!!pose.s;p.av.airborne=Math.abs(pose.vy||0)>.2;p.stale=pose.stale;
@@ -110,8 +112,9 @@ W.bx(1.3,1.7,.8,13,.85,-5,0x26303c);W.bx(1,.7,.06,13,1.25,-4.58,W.mat(0x4cc9b0,{
 W.act(1,13,-3.6,3.4,'📟 仮想端末（チャット）',()=>{chat.classList.add('open');$('bChat').classList.add('on');setTimeout(()=>$('ci').focus(),50)});
 /* ---- people / settings ---- */
 const COLS=[0x4c8bf5,0x4cc9b0,0xe8955a,0xd96b8a,0x9b7be8,0xe6c04c,0x3a4654];
-addEventListener('beforeunload',()=>{if(stream)stream.getTracks().forEach(t=>t.stop());try{peer&&peer.destroy()}catch(e){}});
+addEventListener('beforeunload',()=>{mic(false);stopVoiceTest();try{peer&&peer.destroy()}catch(e){}});
 $('bChat').classList.toggle('on',chat.classList.contains('open'));
+@@SAFETY@@
 @@FACILITIES@@
 startPeer(0);
 return true;

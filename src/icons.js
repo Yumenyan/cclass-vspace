@@ -1,6 +1,7 @@
 // Small, local SVG set. Interface controls remain legible without a font CDN.
 (()=>{
 const paths={
+ mouse:'<rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 2v7m-6 0h12"/>',
  explore:'<circle cx="12" cy="12" r="9"/><path d="m16 8-2.5 5.5L8 16l2.5-5.5Z"/>',
  mic:'<rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>',
  mic_off:'<path d="m3 3 18 18M9 9v3a3 3 0 0 0 5 2M9 5a3 3 0 0 1 6 0v5M5 10v2a7 7 0 0 0 12 5m2-7v2M12 19v3m-4 0h8"/>',

@@ -67,7 +67,7 @@ for(const b of W.BD){b.wm.map=plaster.map;b.wm.normalMap=plaster.normalMap;b.wm.
   if(f===1){
    plane(g,0,.17,-18,8,6,stoneFloor,-Math.PI/2);for(const s of [-1,1]){cylinder(g,s*4.5,1.8,-16,.12,3.6,metal);for(let j=0;j<8;j++)box(g,s*5.8+j*.13,2.1,-14.5,.05,3.7,.16,oak)}
    box(g,0,3.75,-16.2,10,.24,4,walnut);for(let j=-4;j<=4;j++)box(g,j,3.61,-16.2,.16,.08,3.5,oak);box(g,0,3.58,-17.7,8,.04,.04,warm);
-   sign(g,b.n,'THE COMMONS / '+b.id+' HOUSE',0,3.1,-14.43,3.6,.9,Math.PI);
+   const buildingSign=sign(g,b.n,'THE COMMONS / '+b.id+' HOUSE',0,3.1,-14.43,3.6,.9,Math.PI);buildingSign.userData.buildingName=true;b.physicalName=buildingSign;
    sofa(g,8,-7,Math.PI/2,2.7,navy);table(g,6.3,-7,1.15,1.15,walnut);cup(g,6.3,.88,-7);plant(g,11.5,-11.5,1.25);plant(g,-11.5,3,1.1);
    sign(g,'WELCOME HOME','LOUNGE · WORK · PLAY',0,2.3,-2.64,1.65,.65,Math.PI);
    for(let j=0;j<3;j++){const x=-8+j*8;sign(g,((window.CC_CONFIG||{}).tenants||[]).find(t=>t.building===b.id&&t.slot===j)?.name||'ATELIER '+(j+1),'OPEN FOR IDEAS',x,2.45,13.65,3,.7,Math.PI);for(let k=0;k<5;k++)box(g,x-1.6+k*.8,1.3,11.9,.35,.45+(k%2)*.25,.3,bookMats[k]);pendant(g,x,10.5,2.7)}
@@ -123,11 +123,12 @@ for(let i=0;i<18;i++){const a=i*2.39996,r=78+(i%4)*9,x=Math.cos(a)*r,z=Math.sin(
 // Only the nearby interior receives an extra fill light; emissive fixtures remain cheap.
 const fill=new T.PointLight(0xffe4bb,0,12,2);S.add(fill);let lighting=null;
 W.onLighting=solar=>{lighting=solar;Object.values(materials).forEach(m=>m.envMapIntensity=.12+solar.day*.35);glass.envMapIntensity=.2+solar.day*.5;cityMaterial.emissiveIntensity=.05+solar.night*.8;warm.emissiveIntensity=.4+solar.night*1.3;signTextures.forEach(m=>m.emissiveIntensity=.12+solar.night*.42)};
-W.onTick.push(()=>{const r=W.rooms.find(r=>r.zone===W.me.zone);fill.intensity=r&&!W.customWorld?(low?1.1:2.2):0;fill.position.set(W.me.x,(W.me.f-1)*FH+3.6,W.me.z);ceilings.forEach(({r,ceiling})=>ceiling.visible=W.prefs.camera==='first'&&W.me.zone===r.zone);});
+W.onTick.push(()=>{const r=W.rooms.find(r=>r.zone===W.me.zone);fill.intensity=r&&!W.customWorld?(low?1.1:2.2):0;fill.position.set(W.me.x,(W.me.f-1)*FH+3.6,W.me.z);ceilings.forEach(({r,ceiling})=>ceiling.visible=W.mode3d&&W.me.zone===r.zone);});
 if(W.solar)W.onLighting(W.solar);
 // Flatten authored furnishings into material/geometry batches while preserving floor visibility.
 let instanceCount=0,batchCount=0;
 const roots=[outdoor,...W.BD.flatMap(b=>b.G.filter(Boolean))];S.updateMatrixWorld(true);
 for(const root of roots){const batches=new Map(),inverse=new T.Matrix4().copy(root.matrixWorld).invert();root.traverse(m=>{if(!m.isMesh||m.isInstancedMesh||!m.userData||m===root||ceilings.some(x=>x.ceiling===m)||m.geometry.type==='PlaneGeometry'||!Object.values(geometry).includes(m.geometry))return;const key=m.geometry.uuid+'|'+m.material.uuid;if(!batches.has(key))batches.set(key,[]);batches.get(key).push(m)});for(const items of batches.values()){if(items.length<3)continue;const batch=new T.InstancedMesh(items[0].geometry.clone(),items[0].material,items.length);batch.castShadow=!low;batch.receiveShadow=true;batch.frustumCulled=true;const bounds=new T.Box3();items.forEach((m,i)=>{const matrix=new T.Matrix4().multiplyMatrices(inverse,m.matrixWorld);batch.setMatrixAt(i,matrix);if(!m.geometry.boundingBox)m.geometry.computeBoundingBox();bounds.union(m.geometry.boundingBox.clone().applyMatrix4(matrix));m.parent.remove(m)});batch.geometry.boundingSphere=bounds.getBoundingSphere(new T.Sphere());batch.instanceMatrix.needsUpdate=true;root.add(batch);instanceCount+=items.length;batchCount++}}
+S.traverse(o=>{if(o.userData.buildingName)o.visible=W.prefs.showBuildingNames!==false});
 W.detailStats={instances:instanceCount,batches:batchCount,materials:Object.keys(materials).length,rooms:W.rooms.length};
 })();

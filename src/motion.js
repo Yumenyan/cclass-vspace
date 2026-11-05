@@ -34,5 +34,15 @@ const CC_MOTION=(()=>{
   const horizon=clamp((t-latest.t)/1000,0,.25),stale=now-buffer.lastArrival>1200;
   return {...latest,x:latest.x+vx*horizon,z:latest.z+vz*horizon,y:latest.g?latest.y:Math.max(0,latest.y+clamp(latest.vy||0,-8,8)*horizon-9*horizon*horizon*(latest.y>0?1:0)),stale};
  }
- return {vertical,remote,push,sample,angle};
+ // Swept camera sphere against boxes. A point ray alone clips near-plane corners.
+ function cameraDistance(origin,desired,boxes,radius=.2){
+  const delta=desired.map((v,i)=>v-origin[i]),length=Math.hypot(...delta);if(length<1e-6)return 0;
+  let limit=1;
+  for(const box of boxes){const mins=[box.x0-radius,box.y0-radius,box.z0-radius],maxs=[box.x1+radius,box.y1+radius,box.z1+radius];let enter=0,leave=1,hit=true;
+   for(let axis=0;axis<3;axis++){if(Math.abs(delta[axis])<1e-9){if(origin[axis]<mins[axis]||origin[axis]>maxs[axis]){hit=false;break}}else{let a=(mins[axis]-origin[axis])/delta[axis],b=(maxs[axis]-origin[axis])/delta[axis];if(a>b)[a,b]=[b,a];enter=Math.max(enter,a);leave=Math.min(leave,b);if(enter>leave){hit=false;break}}}
+   if(hit&&leave>=0&&enter<=1)limit=Math.min(limit,Math.max(0,enter-.025/length));
+  }return length*limit;
+ }
+ function walkBob(phase,speed,grounded,enabled){const strength=enabled&&grounded?clamp(speed/6,0,1.35):0;return {x:Math.sin(phase)*.017*strength,y:Math.sin(phase*2)*.025*strength,roll:Math.sin(phase)*.005*strength}}
+ return {vertical,remote,push,sample,angle,cameraDistance,walkBob};
 })();

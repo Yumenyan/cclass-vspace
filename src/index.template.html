@@ -19,6 +19,7 @@
   <button id="bMode" class="ib" title="上空視点に切り替え（V）"><span class="ms">map</span><em>視点</em></button>
   <span class="dock-divider"></span>
   <button id="bSet" class="ib" title="設定"><span class="ms">tune</span><em>設定</em></button>
+  <button id="bLook" class="ib" aria-pressed="false" title="マウス固定で見回す（L）"><span class="ms">mouse</span><em>見回す</em></button>
   <button id="bHelp" class="ib" title="操作ガイド（H）"><span class="ms">help</span></button>
  </div>
  <button id="mini" class="glass" title="マップを開く"><canvas id="minimap" width="180" height="180"></canvas><span>マップ <kbd>M</kbd></span></button>
@@ -29,7 +30,7 @@
  <div id="ring" class="mem"></div>
  <div id="js" aria-label="移動スティック"><i></i></div><div id="touchActions"><button id="bSprint" aria-label="ダッシュ切替">ダッシュ</button><button id="bJump" aria-label="ジャンプ">↥<small>ジャンプ</small></button></div><div id="worldClock" class="glass"><span id="clockPhase">昼</span><time id="clockTime">--:--</time><small>JST · 共通時刻</small></div><span id="sprintState" hidden>ダッシュ ON · Ctrlで解除</span>
  <button id="act" class="glass" hidden><kbd>E</kbd><span id="actl"></span></button>
- <div id="toasts" role="status" aria-live="polite"></div>
+ <div id="lookHint" class="glass" hidden>マウス固定中 · <kbd>Esc</kbd> で解除</div><div id="toasts" role="status" aria-live="polite"></div>
 </div>
 <div id="pop" hidden></div>
 <div id="gate">
@@ -54,6 +55,7 @@ window.addEventListener("error", e => { if (!window.WORLD_READY && /THREE|WebGL/
 </script>
 <script>
 @@EXPERIENCE@@
+@@SOUND@@
 @@ATMOSPHERE@@
 @@DETAILS@@
 </script>

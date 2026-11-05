@@ -13,3 +13,11 @@ const edge=motion.remote();motion.push(edge,p(0,1,0,{ry:Math.PI-.05}),0);motion.
 motion.push(b,p(60,3,300,{f:2}),600);assert.equal(b.frames.length,1);assert.equal(b.teleported,true);
 const platform=motion.remote();motion.push(platform,p(0,1,0,{y:.9,g:1,vx:0}),0);assert.equal(motion.sample(platform,500).y,.9);
 console.log('PASS: frame-independent jumps, landing, ceilings, jitter buffer, packet order, shortest rotation, bounded prediction and teleport reset.');
+const wall={x0:2,x1:2.4,y0:0,y1:3,z0:-3,z1:3};
+assert.ok(motion.cameraDistance([0,1.5,0],[5,1.5,0],[wall])<1.8,'camera sphere stops before the wall');
+assert.equal(motion.cameraDistance([0,1.5,0],[5,1.5,0],[{...wall,y1:.9}]),5,'low furniture must not obstruct the head-height camera');
+assert.ok(motion.cameraDistance([0,1.5,0],[0,7,0],[{x0:-14,x1:14,z0:-14,z1:14,y0:4.6,y1:4.8}])<2.9,'ceiling clearance includes near-plane radius');
+assert.equal(motion.cameraDistance([0,1,0],[0,1,0],[]),0);
+assert.ok(Math.abs(motion.walkBob(1,6,true,true).y)>0);
+for(const [speed,grounded,enabled] of [[0,true,true],[6,false,true],[6,true,false]])assert.equal(motion.walkBob(1,speed,grounded,enabled).y,0);
+console.log('PASS: opaque-wall camera clearance, furniture heights, ceilings, and grounded-only optional walk bob.');

@@ -35,6 +35,15 @@ async function boot(id){
  b.W.navigate();await sleep(180);$('ci').value='room secret';$('cs').click();await sleep(40);assert.ok(!b.w.document.getElementById('log').textContent.includes('room secret'));
  const remote=[...W.memberAPI.peers.values()][0],priv=W.rooms.find(r=>r.k==='private'&&r.own===0);W.memberAPI.onData(remote.pid,remote.conn,{t:'dr',z:priv.zone,c:true});assert.equal(W.doors[priv.zone].closed,false);const old=remote.tx;W.memberAPI.onData(remote.pid,remote.conn,{t:'p',x:NaN,z:0,f:1,ry:0,zn:'out'});assert.equal(remote.tx,old);
  W.showWorlds();await sleep(80);assert.ok($('pop').querySelector('[data-world]'));W.closePop();$('bSet').click();assert.ok($('profileSave'));W.closePop();$('bPeople').click();assert.ok($('deafen'));W.closePop();
+ // Individually scoped safety controls persist and room-entry rules propagate to the owner.
+ W.safety.set(accounts[1],{volume:.25,chat:'none',hideAvatar:true,entry:true});await sleep(250);
+ assert.equal(W.safety.get(accounts[1]).volume,.25);assert.equal([...W.memberAPI.peers.values()][0].av.g.visible,false);
+ const logBefore=$('log').textContent;b.W.memberAPI.send({t:'c',m:'blocked message'});await sleep(60);assert.equal($('log').textContent,logBefore);
+ const own=W.rooms.find(r=>r.k==='private'&&r.own===0),blockedDestination=b.W.rooms.find(r=>r.zone===own.zone);assert.equal(b.W.canEnterRoom(blockedDestination),false);b.W.navigate(blockedDestination);await sleep(60);assert.notEqual(b.W.me.zone,own.zone);
+ W.safety.set(accounts[1],{volume:1,chat:'log',hideAvatar:false,entry:false});await sleep(250);assert.equal(b.W.canEnterRoom(blockedDestination),true);b.W.memberAPI.send({t:'c',m:'log only'});await sleep(60);assert.ok($('log').textContent.includes('log only'));
+ W.safety.clear(accounts[1]);assert.equal(W.safety.get(accounts[1]).chat,'all');
+ $('bSet').click();assert.equal($('headBob').checked,true);$('showBuildingNames').click();assert.ok(W.BD.every(b=>!b.nameLabel.visible));$('showBuildingNames').click();assert.ok(W.BD.every(b=>b.nameLabel.visible));assert.ok($('noiseMode'));assert.ok($('sfxEnabled'));W.closePop();
+ assert.ok(W.BD.every(b=>b.wm.opacity===1&&!b.wm.transparent));
  assert.deepEqual(errors,[]);a.dom.window.close();b.dom.window.close();console.log('PASS: two-member auth/mesh, all 16 rooms, games, scoped chat, privacy, editor, persistence, offline fallbacks and input lifecycle.');process.exit(0);
 })().catch(e=>{console.error(e);process.exit(1)});
 

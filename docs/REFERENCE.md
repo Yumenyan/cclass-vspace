@@ -11,6 +11,9 @@
 - `src/details.js`: 手続き型PBR素材、建築/家具、静的部品のインスタンス化と境界。
 - `src/experience.js`: 探索、ミニマップ、初回案内、設定、照明、合成環境音。公開層。
 - `src/auth.js`: 暗号の解錠、ログイン、ゲスト入室。
+- `src/sound.js`: 操作/ゲーム/交流の合成効果音と音量設定。
+- `src/voice.js`: 送信前のRNNoise/標準処理と、送信しない比較録音。member内に挿入して暗号化。
+- `src/safety.js`: アカウント別の表示/受信/入室方針。member内に挿入して暗号化。
 - `src/member.js`: PeerJSメッシュ、近接通話、チャット、ドア同期。
 - `src/facilities.js`: 部屋機能、共有、ゲーム、個人設定、空間JSON。member.jsの中に挿入され、**まとめて暗号化**されます。
 - `tools/build.mjs`: Node標準暗号APIによるビルド。`tools/build.py` は互換用の転送先。
@@ -69,7 +72,7 @@ Peer IDは `cclass-<roomKey>-<slot 0..15>`。各参加者は空きslotを取り�
 
 | t | 主なフィールド |
 |---|---|
-| `hi` | id, name, col, av（画像dataURL）, glb, dr, minutes |
+| `hi` | id, name, col, av（画像dataURL）, glb, dr, minutes, noEntry（所有者の個人部屋へ入れないID） |
 | `p` | x, z, f, ry, zn, s, world, y, g, vx, vz, vy, q, tm（0.1秒ごと、静止時1秒） |
 | `c` | m, room（nullなら全体、ゾーンIDならその部屋） |
 | `dr` | z, c（privateは接続側の名乗ったIDと持ち主を照合） |
@@ -117,3 +120,19 @@ JSONインポートは200KBまで。GLBアバターは10MBまで、外部リソ�
 `W.prefs.theme/uiMode/font` は端末別のUI設定。旧 `prefs.time` は移行時に削除します。`W.applyTheme()` で全UIと空間ラベルの書体を更新します。星や空のような環境メッシュには `userData.environment` を付け、追加空間でも表示を維持します。
 
 描画検証は `npm test` の物理/補間と複数人統合テスト、`npm run test:browser` の実ブラウザー・共通時計・テーマ・PC/スマホ表示、`npm run test:deployment` の公開対象検証に分かれます。`W.renderPaused` は画面検証で非操作中の描画負荷を止めるためのフラグです。通常は未設定です。
+
+## 2.2のカメラ・視点操作・音声
+
+`W.motion.cameraDistance(origin, desired, boxes, radius)` は床/天井を含むワールド座標のAABBでカメラ球の移動範囲を求めます。遮蔽物への接近は即座に短縮し、離れると指数補間で距離を復元します。カメラ用の床スラブは物理歩行用のCOLとは別に保持します。3Dの壁はopacity=1で、上階も表示します。2Dだけは上階を非表示にします。
+
+`W.prefs.showBuildingNames` と `headBob` は既存の保存データにもtrueで補完します。建物名はuserData.buildingNameを持つスプライト/看板だけが対象です。`W.lockPointer()/unlockPointer()/pointerLocked` はPointer Lockの状態。固定中の相対マウス移動とドラッグのイベントは二重に加算しません。パネル・Esc・blur・タブ非表示・上空表示への変更で解除します。歩行の揺れは実移動速度と接地を使い、停止時には減衰させます。
+
+RNNoiseのラッパーは@sapphi-red/web-noise-suppressor 0.4.1。distのESM、worklet、通常/SIMD WASMとライセンスをvendorにコピーします。ビルドにはnpm ciが必要です。音声はraw → gain → highpass → RNNoise → compressor → analyser → MediaStreamDestination → PeerJS。受信の近接GainNodeは従来どおり別です。ノイズ除去はMediaStreamをWebRTCに渡す前に行い、サーバーへ処理依頼しません。
+
+`W.voice.settings/createPipeline/pipeline/lastError` は検証と設定に使います。マイク切り替えは世代番号で古い非同期取得を破棄します。OFF/退出で入力・出力両方のトラックを止めます。録音テストは独立したパイプラインで、送信中には開始できません。RNNoiseが使えない/停止した場合は標準処理へフォールバックし、強力モード動作中と偽らない表示にします。
+
+`W.safety.get/set/clear` はaccount IDで保存する方針。volume、chat(all/log/none)、hideAvatar、entry、avoidRoomsを独立に扱います。位置・ドア等の制御パケットはブロックしても処理し、表示/音量だけを制限します。noEntryは本人のhiだけから受け取り、対象の持ち主の個人部屋へ移動/歩行するときにW.canEnterRoomで確認。新たに拒否された状態で既に在室していれば廊下へ戻します。共有部屋の追放やオフライン時の権限強制は行いません。
+
+`W.sfx.play(name,category)` のcategoryはui/game/world。効果音マスターと分類別設定は端末に保存します。テスト用のpreview分類はマスター音量に従います。音源は短いオシレーター音を合成し、外部の音声データは配信しません。
+
+実ブラウザーテストはローカルPeerServerと-qa付きの隔離名を使います。合成音声fixture（マイク録音ではない）に一定のノイズを混ぜ、RNNoiseの出力と音声残存を検証します。これは特定条件での回帰テストであり、実環境の聴感品質やDiscord/Krispと同等の性能を示す測定ではありません。
