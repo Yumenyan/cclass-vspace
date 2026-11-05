@@ -1,4 +1,4 @@
-# C組仮想空間
+# C-Class VSpace
 
 HTML + CSS + JS + three.js だけで動く、VRChat 風の仮想空間アプリ（PC / スマホ対応、VR 非対応）。
 サーバーは持たず、GitHub Pages に置くだけで動きます。メンバー同士の同期・チャット・ボイスチャットは WebRTC（PeerJS の公開ブローカー）で直接つながります。
