@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#253e37">
+<title>C組仮想空間</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Outfit:wght@500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<style>@@STYLE@@</style></head><body class="guest">
+<canvas id="c" aria-label="C組の仮想空間"></canvas><div id="vignette"></div>
+<div id="hud" hidden>
+ <div id="brand" class="glass"><span class="brand-mark">C</span><div>C組の居場所<small>THE COMMONS</small></div></div>
+ <div id="loc" class="glass"><span class="location-dot"></span><div><small id="locsub">C CLASS / MAIN WORLD</small><span id="locn">中央庭園</span></div><span id="zoneLock" class="ms" hidden>lock</span></div>
+ <div id="tools" class="glass" role="toolbar" aria-label="メインメニュー">
+  <button id="bExplore" class="ib" title="空間を探す（M）"><span class="ms">explore</span><em>探索</em></button>
+  <span class="dock-divider"></span>
+  <button id="bMic" class="ib mem" title="マイクを切り替え"><span class="ms">mic_off</span><em>マイク</em></button>
+  <button id="bChat" class="ib mem" title="チャット"><span class="ms">chat</span><em>チャット</em><span id="unread" hidden>0</span></button>
+  <button id="bPeople" class="ib mem" title="オンラインのメンバー"><span class="ms">group</span><em>メンバー <span id="pc">1</span></em></button>
+  <button id="bMode" class="ib" title="上空視点に切り替え（V）"><span class="ms">map</span><em>視点</em></button>
+  <span class="dock-divider"></span>
+  <button id="bSet" class="ib" title="設定"><span class="ms">tune</span><em>設定</em></button>
+  <button id="bHelp" class="ib" title="操作ガイド（H）"><span class="ms">help</span></button>
+ </div>
+ <button id="mini" class="glass" title="マップを開く"><canvas id="minimap" width="180" height="180"></canvas><span>マップ <kbd>M</kbd></span></button>
+ <div id="controlHint"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動</span><span>ドラッグで見回す</span><span><kbd>Shift</kbd> 走る</span></div>
+ <div id="welcome" class="glass" hidden><button id="welcomeClose" class="icon-close" aria-label="案内を閉じる">×</button><span class="eyebrow">MAKE YOURSELF AT HOME</span><h2>ここから、いつものみんなと。</h2><p>庭園でひと息。気になる部屋へ寄り道。<br>「探索」から、今日の居場所を見つけましょう。</p><button id="welcomeExplore" class="btn">空間を探す <span>↗</span></button></div>
+ <div id="stat" class="mem" data-s="wait"><i></i><span id="statt">接続中…</span></div>
+ <div id="chat" class="glass mem"><div class="chat-head"><b>みんなのチャット</b><select id="chatScope" aria-label="送信先"><option value="all">全体</option><option value="room">この部屋</option></select><button id="chatClose" aria-label="チャットを閉じる">×</button></div><div id="log" role="log" aria-live="polite"></div><div id="cf"><input id="ci" class="fld" maxlength="200" placeholder="メッセージを入力" autocomplete="off"><button id="cs"><span class="ms">send</span></button></div></div>
+ <div id="ring" class="mem"></div>
+ <div id="js"><i></i></div>
+ <button id="act" class="glass" hidden><kbd>E</kbd><span id="actl"></span></button>
+ <div id="toasts" role="status" aria-live="polite"></div>
+</div>
+<div id="pop" hidden></div>
+<div id="gate">
+ <div class="gate-story"><span class="eyebrow">A LITTLE CLOSER, EVEN FROM HERE</span><h1>いつものみんなと、<br>いつもと違う場所で。</h1><p>話したり、遊んだり、何かをつくったり。<br>ふらっと集まれる、C組の小さな世界。</p><div class="gate-tags"><span>01  集まる</span><span>02  遊ぶ</span><span>03  つくる</span></div><div class="gate-footer"><span class="brand-mark">C</span> THE COMMONS <i>自分らしく、くつろげる場所。</i></div></div>
+ <div class="card glass"><span class="eyebrow">WELCOME TO THE COMMONS</span><div class="logo">C組の居場所<small>さあ、ひとつの空間に。</small></div>
+ <form id="loginForm"><label for="uid">アカウントID</label><input id="uid" class="fld" placeholder="あなたのID" autocapitalize="off" autocomplete="username" spellcheck="false" required>
+ <label for="pw">パスワード</label><input id="pw" class="fld" type="password" placeholder="パスワードを入力" autocomplete="current-password" required>
+ <label class="check"><input type="checkbox" id="remember">この端末でログインを記憶する</label>
+ <button id="lg" class="btn" type="submit">空間に入る <span>→</span></button></form>
+ <div id="er" role="alert"></div><div class="or"><span>まずは、のぞいてみる</span></div><button id="gs" class="btn sub">ゲストとして散策 <span>↗</span></button>
+ <p class="note">ゲストでも街を自由に散策できます。会話や部屋の機能はメンバーでログインすると使えます。</p><span class="secure-note"><span class="ms">lock</span> メンバーだけのプライベートな集まり</span></div>
+</div>
+<div id="fatal" hidden role="alert"><h2>空間を読み込めませんでした</h2><p>ブラウザーのWebGL設定とインターネット接続を確認し、再読み込みしてください。</p><button onclick="location.reload()">再読み込み</button></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>const ENC=@@ENC@@;window.CC_CONFIG=@@CFG@@;</script>
+<script>
+window.addEventListener("error", e => { if (!window.WORLD_READY && /THREE|WebGL/.test(e.message)) document.getElementById("fatal").hidden=false; });
+@@WORLD@@
+</script>
+<script>
+@@EXPERIENCE@@
+</script>
+<script>
+@@AUTH@@
+</script>
+<script>window.WORLD_READY=true;</script>
+</body></html>
