@@ -14,7 +14,7 @@ async function unlock(id,pw){
  return {code,room:_hex(await crypto.subtle.digest('SHA-256',raw)).slice(0,16)};
 }
 /*UI*/
-function enterWorld(){$('gate').hidden=true;$('hud').hidden=false}
+function enterWorld(){$('gate').hidden=true;$('hud').hidden=false;W.onEnter&&W.onEnter()}
 function busy(b){$('lg').disabled=b;$('gs').disabled=b}
 async function login(id,pw,auto){
  busy(true);$('er').textContent=auto?'自動ログイン中…':'確認中…';
@@ -23,7 +23,7 @@ async function login(id,pw,auto){
   const ok=await new Function('W','return (async()=>{'+r.code+'\n})()')(W);
   if(!ok)throw new Error('bad');
   W.member=true;document.body.classList.remove('guest');
-  try{localStorage.setItem('cc_auth',JSON.stringify({id:W.id,pw}))}catch(e){}
+  try{if($('remember').checked)localStorage.setItem('cc_auth',JSON.stringify({id:W.id,pw}));else localStorage.removeItem('cc_auth')}catch(e){}
   $('er').textContent='';enterWorld();
  }catch(e){
   const m=String(e&&e.message);
@@ -32,7 +32,7 @@ async function login(id,pw,auto){
   console.error(e);
  }finally{busy(false)}
 }
-$('lg').onclick=()=>login($('uid').value,$('pw').value,false);
-$('pw').onkeydown=e=>{if(e.key==='Enter')$('lg').click()};
+$('loginForm').onsubmit=e=>{e.preventDefault();if(!$('lg').disabled)login($('uid').value,$('pw').value,false)};
+
 $('gs').onclick=enterWorld;
-try{const s=JSON.parse(localStorage.getItem('cc_auth')||'null');if(s&&s.id&&s.pw){$('uid').value=s.id;login(s.id,s.pw,true)}}catch(e){}
+try{const s=JSON.parse(localStorage.getItem('cc_auth')||'null');if(s&&s.id&&s.pw){$('uid').value=s.id;$('remember').checked=true;login(s.id,s.pw,true)}}catch(e){}
