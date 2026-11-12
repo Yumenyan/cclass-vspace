@@ -45,9 +45,9 @@ const moon=new THREE.Mesh(new THREE.SphereGeometry(3.5,20,16),new THREE.MeshBasi
 const hemi=W.S.children.find(o=>o.isHemisphereLight),dayTop=new THREE.Color('#6c9db8'),nightTop=new THREE.Color('#08142b'),dayBottom=new THREE.Color('#dddcc8'),nightBottom=new THREE.Color('#25324d'),sunset=new THREE.Color('#cc997f');
 W.updateAtmosphere=()=>{
  const solar=W.solarAt(now());W.solar=solar;W.sunOffset=solar.sun;
- skyMaterial.uniforms.top.value.copy(nightTop).lerp(dayTop,solar.day);skyMaterial.uniforms.bottom.value.copy(nightBottom).lerp(dayBottom,solar.day).lerp(sunset,solar.twilight*.65);skyMaterial.uniforms.sunDir.value.copy(solar.sun);skyMaterial.uniforms.glow.value=solar.day;
+ skyMaterial.uniforms.top.value.copy(nightTop).lerp(dayTop,solar.day);skyMaterial.uniforms.bottom.value.copy(nightBottom).lerp(dayBottom,solar.day).lerp(sunset,solar.twilight*.65);skyMaterial.uniforms.sunDir.value.copy(solar.sun);skyMaterial.uniforms.glow.value=solar.day;const visual=W.storage.get('cc_visual_pack',{});if(visual.sky){skyMaterial.uniforms.top.value.set(visual.sky);skyMaterial.uniforms.bottom.value.set(visual.sky).lerp(new THREE.Color('#ffffff'),.35)}
  FOG.color.copy(skyMaterial.uniforms.bottom.value);S.background=FOG.color;hemi.color.setRGB(.75+.25*solar.day,.8+.2*solar.day,1);hemi.groundColor.set(solar.day>.5?0x717c5d:0x1c263c);hemi.intensity=.55+solar.day*.25;
- sun.color.set(solar.twilight>.2?0xffc291:0xfff0d5);sun.intensity=.12+solar.day*1.35;R.toneMappingExposure=.95;stars.material.opacity=solar.night*.85;stars.visible=solar.day<.5;moon.visible=solar.night>.15;moon.position.set(-solar.sun.x,75,95);
+ sun.color.set(solar.twilight>.2?0xffc291:0xfff0d5);sun.intensity=.12+solar.day*1.35;if(!W.storage.get('cc_visual_pack',{}).exposure)R.toneMappingExposure=.95;stars.material.opacity=solar.night*.85;stars.visible=solar.day<.5;moon.visible=solar.night>.15;moon.position.set(-solar.sun.x,75,95);
  if($('clockTime')){$('clockTime').textContent=timeFormat.format(now());$('clockTime').dateTime=new Date(now()).toISOString();$('clockPhase').textContent=solar.phase;$('worldClock').title=source+' · '+timezone}
  const settings=$('settingsTime');if(settings)settings.textContent=' '+fullFormat.format(now())+' / '+source;
  W.onLighting?.(solar);

@@ -14,7 +14,7 @@ async function boot(id){
  Object.defineProperty(w,'crypto',{value:webcrypto});w.fetch=async url=>{if(String(url).includes('docs.google.com'))throw Error('offline');let file=String(url).replace('https://example.com/','');if(!/^(data|worlds)\//.test(file))throw Error('offline');return {ok:true,json:async()=>JSON.parse(fs.readFileSync(path.join(root,file),'utf8'))}};
  const context=new Proxy({measureText:t=>({width:String(t).length*24}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>k in o?o[k]:()=>{}});w.HTMLCanvasElement.prototype.getContext=()=>context;
  const scripts=[...w.document.querySelectorAll('script:not([src])')].map(s=>s.textContent);w.eval(scripts.join('\n;\n')+';window.__W=W;');
- const W=w.__W;assert.equal(W.rooms.length,16);assert.equal(W.BD.length,4);
+ const W=w.__W;assert.equal(W.rooms.filter(r=>r.k==='private').length,accounts.length);assert.equal(W.rooms.length,22);assert.equal(W.BD.length,4);
  w.document.getElementById('gs').click();assert.equal(w.document.getElementById('gate').hidden,true);
  w.document.getElementById('bExplore').click();assert.ok(w.document.querySelectorAll('[data-room]').length>=4);W.closePop();
  if(id){w.document.getElementById('uid').value=id;w.document.getElementById('pw').value=secrets.passwords[id];w.document.getElementById('lg').click();for(let i=0;i<100&&!W.member;i++)await sleep(50);assert.equal(W.member,true,w.document.getElementById('er').textContent)}
@@ -47,6 +47,18 @@ async function boot(id){
  W.safety.clear(accounts[1]);assert.equal(W.safety.get(accounts[1]).chat,'all');
  $('bSet').click();assert.equal($('headBob').checked,true);$('showBuildingNames').click();assert.ok(W.BD.every(b=>!b.nameLabel.visible));$('showBuildingNames').click();assert.ok(W.BD.every(b=>b.nameLabel.visible));assert.ok($('noiseMode'));assert.ok($('sfxEnabled'));W.closePop();
  assert.ok(W.BD.every(b=>b.wm.opacity===1&&!b.wm.transparent));
- assert.deepEqual(errors,[]);a.dom.window.close();b.dom.window.close();console.log('PASS: two-member auth/mesh, all 16 rooms, games, scoped chat, privacy, editor, persistence, offline fallbacks and input lifecycle.');process.exit(0);
+ // New campus and authenticated community controls.
+ assert.equal(W.rooms.filter(r=>r.k==='private').length,accounts.length);assert.ok(W.rooms.filter(r=>r.k==='private').every(r=>r.n===accounts[r.own]+'の部屋'));
+ W.seat(3.25,0,1,.7);assert.equal(W.me.sit,true);assert.ok(Math.abs(W.me.y-.21)<.001);W.me.sit=false;W.navigate();
+ assert.ok(W.colliders.some(c=>c.radius===3.5&&c.standable&&c.y1===.7));
+ W.prefs.bindings.KeyW='KeyP';assert.equal(W.mapKey('KeyP'),'KeyW');assert.equal(W.mapKey('KeyW'),'Unbound');W.prefs.bindings={};
+ assert.throws(()=>W.validateVisualPack({version:1,exposure:99}));assert.equal(W.validateVisualPack({version:1,exposure:1.2}).exposure,1.2);
+ assert.equal(W.community.youtubeID('https://www.youtube.com/watch?v=dQw4w9WgXcQ'),'dQw4w9WgXcQ');assert.equal(W.community.youtubeID('https://evil.test/watch?v=dQw4w9WgXcQ'),null);
+ assert.ok(W.operatorKey);assert.equal(await W.issueModeration(accounts[1],'chat',1),true);await sleep(200);assert.ok(b.W.moderated.chat>Date.now());await W.issueModeration(accounts[1],'clear',1);await sleep(200);assert.equal(b.W.moderated.chat,undefined);
+ $('bSet').click();$('linkID').value=accounts[1];$('linkPassword').value=secrets.passwords[accounts[1]];$('linkAccount').click();for(let i=0;i<80&&!W.canToggle(W.rooms.find(r=>r.k==='private'&&r.own===1));i++)await sleep(50);assert.equal(W.canToggle(W.rooms.find(r=>r.k==='private'&&r.own===1)),true);await sleep(250);assert.equal(b.W.canToggle(b.W.rooms.find(r=>r.k==='private'&&r.own===0)),true);W.closePop();
+ W.storage.set('cc_home_'+accounts[0],true);W.onMemberEnter();assert.equal(W.me.x,W.rooms.find(r=>r.k==='private'&&r.own===0).cx);W.storage.set('cc_home_'+accounts[0],false);W.navigate();
+ const points=W.community.progress.points;W.award('course',25);assert.equal(W.community.progress.points,points+25);
+ const plaza=W.rooms.find(r=>r.k==='plaza');W.roomHandlers.plaza(plaza);assert.ok($('objectEditor'));W.closePop();
+ assert.deepEqual(errors,[]);a.dom.window.close();b.dom.window.close();console.log('PASS: two-member auth/mesh, all rooms, games, scoped chat, privacy, editor, persistence, offline fallbacks and input lifecycle.');process.exit(0);
 })().catch(e=>{console.error(e);process.exit(1)});
 

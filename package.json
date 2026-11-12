@@ -1,6 +1,6 @@
 {
   "name": "cclass-vspace",
-  "version": "2.3.0",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "build": "node tools/build.mjs",
@@ -9,7 +9,8 @@
     "test:browser": "node tests/visual.cjs",
     "pages": "node tools/prepare-pages.mjs",
     "test:deployment": "node tests/deployment.mjs",
-    "test:shortcuts": "node tests/shortcut.cjs"
+    "test:shortcuts": "node tests/shortcut.cjs",
+    "test:campus": "node tests/campus.cjs"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

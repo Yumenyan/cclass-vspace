@@ -1,8 +1,8 @@
 {
   "events": [],
   "github": {
-    "owner": "",
-    "repo": "",
+    "owner": "Yumenyan",
+    "repo": "cclass-vspace",
     "branch": "main"
   },
   "sheetId": "1UAiWmQ7JgV5tZPWA_sDZhVnlhiqntx4fDCe9OWLF0C4",
@@ -10,5 +10,19 @@
   "ice": null,
   "apps": [],
   "tenants": [],
-  "worldTimeZone": "Asia/Tokyo"
+  "worldTimeZone": "Asia/Tokyo",
+  "operators": [
+    "tamakomugi",
+    "tkk_8619"
+  ],
+  "countSheets": [
+    {
+      "name": "処分・暴走度カウント",
+      "sheet": "暴走度カレンダー(821以降)"
+    },
+    {
+      "name": "風呂キャン",
+      "sheet": "FCカレンダー"
+    }
+  ]
 }

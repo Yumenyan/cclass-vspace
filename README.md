@@ -1,3 +1,7 @@
+# 3.0 の更新
+
+今回の実装内容・制限・運用方法は [docs/UPDATE-3.0.md](docs/UPDATE-3.0.md) を参照してください。
+
 # C組の居場所 · THE COMMONS
 
 PC・スマホのブラウザーで集まれる、C組の仮想空間です。WebGL / three.js と WebRTC / PeerJS を使い、GitHub Pagesで配信できます。VRヘッドセットには対応していません。

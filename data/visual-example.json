@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "exposure": 1.05,
+  "fogNear": 90,
+  "fogFar": 300,
+  "sky": "#a5bfca",
+  "tint": "#e4ded0",
+  "wind": 1.4,
+  "rain": 0,
+  "dust": 0.5
+}

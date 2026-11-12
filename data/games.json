@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "rooms": {
+    "A": {
+      "title": "○×ゲーム",
+      "kind": "tic"
+    },
+    "B": {
+      "title": "じゃんけん",
+      "kind": "rps"
+    },
+    "C": {
+      "title": "反応速度チャレンジ",
+      "kind": "reaction"
+    },
+    "D": {
+      "title": "神経衰弱",
+      "kind": "memory"
+    },
+    "E": {
+      "title": "みんなでサイコロ",
+      "kind": "dice"
+    }
+  }
+}

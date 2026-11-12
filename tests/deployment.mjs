@@ -9,6 +9,7 @@ const html=readFileSync('_site/index.html','utf8'),secrets=JSON.parse(readFileSy
 assert.equal(/@@[A-Z]+@@/.test(html),false);
 assert.equal(html.includes('MAX_FILE='),false,'Member facility implementation must remain encrypted');
 for(const secret of [secrets.datakey,...Object.values(secrets.passwords)])assert.equal(html.includes(secret),false);
+for(const pair of Object.values(secrets.opKeys||{}))assert.equal(html.includes(pair.private.d),false,'Signing keys must stay encrypted');
 const server=spawn(process.execPath,['tools/serve.mjs'],{env:{...process.env,PORT:'8092'},stdio:['ignore','pipe','inherit']});
 try{
  await Promise.race([new Promise(resolve=>server.stdout.once('data',resolve)),new Promise((_,reject)=>setTimeout(()=>reject(Error('server startup timeout')),5000))]);
