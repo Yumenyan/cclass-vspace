@@ -77,7 +77,7 @@ const BD=[
 {id:'W',n:'西館',x:-60,z:0,fl:2,door:'e',col:0xe8955a,rooms:[[2,0,'library','図書館'],[2,3,'count','カウント部屋']]},
 {id:'S',n:'南館',x:0,z:60,fl:2,door:'n',col:0xd96b8a,rooms:[[2,0,'private','個人部屋1',0],[2,2,'private','個人部屋2',1],[2,3,'private','個人部屋3',2],[2,5,'private','個人部屋4',3]]},
 {id:'N',n:'北館',x:0,z:-60,fl:2,door:'s',col:0x3fb8a0,rooms:[[2,1,'creative','クリエイティブ部屋']]}];
-const ACCOUNT_IDS=@@ACCOUNTS@@;const south=BD.find(b=>b.id==='S');south.rooms=ACCOUNT_IDS.map((id,i)=>[2+Math.floor(i/6),i%6,'private',id+'の部屋',i]);south.fl=Math.max(2,1+Math.ceil(ACCOUNT_IDS.length/6));BD.find(b=>b.id==='N').rooms.push([2,4,'plaza','広場編集室']);BD.find(b=>b.id==='W').rooms.push([2,4,'music','ミュージックルーム']);
+const ACCOUNT_IDS=@@ACCOUNTS@@;const south=BD.find(b=>b.id==='S');south.rooms=ACCOUNT_IDS.map((id,i)=>[2+Math.floor(i/6),i%6,'private',id+'の部屋',i]);south.fl=Math.max(2,1+Math.ceil(ACCOUNT_IDS.length/6));BD.find(b=>b.id==='N').fl=3;BD.find(b=>b.id==='N').rooms.push([2,4,'plaza','広場編集室']);BD.find(b=>b.id==='W').rooms.push([2,4,'music','ミュージックルーム']);
 const TF={w:(x,z)=>[z,-x],e:(x,z)=>[-z,x],n:(x,z)=>[x,z],s:(x,z)=>[-x,-z]},SW={w:1,e:1,n:0,s:0};
 const w2=(b,lx,lz)=>{const t=TF[b.door](lx,lz);return[b.x+t[0],b.z+t[1]]};
 const wsz=(b,w,d)=>SW[b.door]?[d,w]:[w,d];
@@ -126,7 +126,7 @@ BD.forEach(b=>{
   };
   if(f>1){lbox(b,g,f,0,0,2*HALF+1,2*HALF+1,.3,-.15,mat(0xcfd3d7),false);ZN[b.id+f]=b.n+' '+f+'F'}else lbox(b,g,f,0,0,2*HALF,2*HALF,.12,0,mat(0xd9d2c6),false,{cast:false});
   if(f===1){ext(-8.5,-HALF,11,.6);ext(8.5,-HALF,11,.6)}else ext(0,-HALF,28.6,.6);
-  ext(0,HALF,28.6,.6);ext(-HALF,0,.6,28);ext(HALF,0,.6,28);
+  ext(-8.5,HALF,11,.6);ext(8.5,HALF,11,.6);ext(-HALF,0,.6,28);ext(HALF,0,.6,28);
   lbox(b,g,f,0,0,5,5,FH-.5,0,mat(0xaab3bb));lbox(b,g,f,0,-2.55,2,.1,3,0,mat(0x7f8b96),false);
   const el=label('エレベーター',{h:.5}),ep=w2(b,0,-1.5);el.position.set(ep[0],(f-1)*FH+3.9,ep[1]);g.add(el);
   const ap=w2(b,0,-4.2);
@@ -144,13 +144,13 @@ BD.forEach(b=>{
  const sg=label(b.n,{h:1.5,bg:hexs(b.col)+'e6'}),sp=w2(b,0,-15.4);sg.position.set(sp[0],5.1,sp[1]);sg.userData.buildingName=true;sg.material.depthTest=true;b.nameLabel=sg;S.add(sg);
  // floor 1 interior: 3 shops + kiosk
  const g1=b.G[1];
- [-8,0,8].forEach((cx,i)=>{if(b.id==='N'&&i===1)return;lbox(b,g1,1,cx,10.5,7,5,.04,.02,mat(0xefe9dd),false,{cast:false});lbox(b,g1,1,cx,8.4,5,.8,1,0,mat(0xb9a98f));const tenant=((window.CC_CONFIG||{}).tenants||[]).find(t=>t.building===b.id&&t.slot===i);const l=label(tenant?tenant.name:'アトリエ '+(i+1),{h:.55}),p=w2(b,cx,12.8);l.position.set(p[0],3.2,p[1]);g1.add(l);const ap=w2(b,cx,6.8);act(1,ap[0],ap[1],2.6,'店舗を見る',()=>W.showShop?W.showShop(b.id,i):toast('ログインすると利用できます'))});
+ [-8,0,8].forEach((cx,i)=>{if(b.id==='N'&&i===1)return;lbox(b,g1,1,cx,10.5,7,5,.04,.02,mat(0xefe9dd),false,{cast:false});lbox(b,g1,1,cx,8.4,5,.8,1,0,mat(0xb9a98f));const tenant=((window.CC_CONFIG||{}).tenants||[]).find(t=>t.building===b.id&&t.slot===i);const l=label(tenant?tenant.name:'アトリエ '+(b.id==='N'&&i===2?2:i+1),{h:.55}),p=w2(b,cx,12.8);l.position.set(p[0],3.2,p[1]);g1.add(l);const ap=w2(b,cx,6.8);act(1,ap[0],ap[1],2.6,'店舗を見る',()=>W.showShop?W.showShop(b.id,i):toast('ログインすると利用できます'))});
  lbox(b,g1,1,-9,-8,3.6,1.4,1.1,0,mat(0xe9c46a));lbox(b,g1,1,-9,-8,4.4,2.2,.2,2.7,mat(b.col),false);
  {const l=label('ミニショップ',{h:.5}),p=w2(b,-9,-8);l.position.set(p[0],3.5,p[1]);g1.add(l);const kp=w2(b,-9,-6);act(1,kp[0],kp[1],3,'🛍 ミニショップ',()=>W.showShop?W.showShop(b.id):toast('ログインすると利用できます'))}
  if(b.id==='N'){lbox(b,g1,1,0,13.6,4,.3,3,0,mat(0x2a2f36),false);const l=label('奥の出口 → 追加のC組仮想空間',{h:.55}),p=w2(b,0,12.6);l.position.set(p[0],3.6,p[1]);g1.add(l);act(1,p[0],p[1],3.2,'🚪 追加の空間へ',()=>W.showWorlds?W.showWorlds():toast('ログインすると利用できます'))}
  b.rooms.forEach(s=>room(b,s));
  const bp=w2(b,0,-HALF-3);
- ACT.push({f:1,x:bp[0],z:bp[1],r:6,l:'🏢 '+b.n+'の案内',fn:()=>pop('<ul>'+Array.from({length:b.fl},(_,i)=>{const f=i+1,rs=b.rooms.filter(r=>r[0]===f).map(r=>r[3]);return'<li><b>'+f+'F</b>　'+(f===1?'アトリエ・ミニショップ'+(b.id==='N'?'・奥の出口':''):esc(rs.join(' / ')))+'</li>'}).join('')+'</ul><p class="mut">各階へは建物中央のエレベーターで移動できます。</p>',b.n)});
+ ACT.push({f:1,x:bp[0],z:bp[1],r:6,l:'🏢 '+b.n+'の案内',fn:()=>pop('<ul>'+Array.from({length:b.fl},(_,i)=>{const f=i+1,rs=b.rooms.filter(r=>r[0]===f).map(r=>r[3]);return'<li><b>'+f+'F</b>　'+(f===1?'アトリエ・ミニショップ'+(b.id==='N'?'・奥の出口':''):esc(rs.join(' / ')))+'</li>'}).join('')+'</ul><p class="mut">各階へは建物中央のエレベーター、または裏側の階段で移動できます。</p>',b.n)});
 });
 BENCH.forEach(p=>act(1,p.x,p.z,2.2,()=>me.sit?'':'🪑 座る',()=>{me.x=p.x;me.z=p.z;me.ry=Math.atan2(-p.x,-p.z);resetMotion();me.y=.075;me.sit=true}));
 /* ---------- avatars ---------- */
@@ -168,17 +168,17 @@ function makeAvatar(name,color){
  for(const side of [-1,1]){const ear=new THREE.Mesh(new THREE.SphereGeometry(.058,12,8),skin);ear.position.set(side*.26,1.7,0);ear.scale.y=1.3;body.add(ear);const eyebrow=bx(.085,.018,.012,side*.09,1.78,.236,hairMat,body);eyebrow.rotation.z=side*.08;const whiteEye=new THREE.Mesh(new THREE.SphereGeometry(.045,12,8),mat(0xf6f2e8));whiteEye.position.set(side*.09,1.72,.238);whiteEye.scale.set(1,.8,.55);body.add(whiteEye)}
  const nose=new THREE.Mesh(new THREE.SphereGeometry(.045,12,8),skin);nose.position.set(0,1.66,.258);nose.scale.set(.7,1,1);body.add(nose);
  bx(.018,.53,.012,0,1.17,.218,mat(0xc5c8b9),body);bx(.2,.025,.022,0,.98,.21,tint,body);bx(.12,.12,.016,.15,1.31,.18,mat(0xc4cbb7),body);bx(.06,.025,.02,.15,1.32,.19,mat(0x59725b),body);
- const plate=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({transparent:true,side:THREE.DoubleSide}));plate.position.y=1.1;plate.rotation.order='YXZ';plate.visible=false;g.add(plate);
+ const plate=new THREE.Mesh(new THREE.PlaneGeometry(1.8,1.8),new THREE.MeshBasicMaterial({transparent:true,side:THREE.DoubleSide}));plate.position.y=.9;plate.rotation.order='YXZ';plate.visible=false;g.add(plate);
  const nl=label(name||'?',{h:.42});nl.position.y=2.4;g.add(nl);
  const eyes=[-.09,.09].map(x=>{const eye=new THREE.Mesh(new THREE.SphereGeometry(.035,8,6),mat(0x293c31));eye.position.set(x,1.72,.253);body.add(eye);return eye});const mouth=bx(.09,.025,.02,0,1.59,.265,0x9c6c59,body);
  const av={g,body,plate,legs,arms,eyes,nameTag:nl,step:0,prev:new THREE.Vector3(),name:name||'?',bl:null,_t:0,
   setName(t){av.name=t;setLabel(nl,(av.speaking?'● ':'')+t)},
   setSpeaking(on){if(av.speaking===on)return;av.speaking=on;nl.userData.o.bg=on?'#426b50':'rgba(248,247,235,.93)';nl.userData.o.fg=on?'#fff':'#294334';setLabel(nl,(on?'● ':'')+av.name)},
   setColor(c){torso.material=mat(c);arms.forEach(a=>a.traverse(m=>{if(m.userData.tint)m.material=mat(c)}))},
-  setImage(url){const token=av.imageToken=(av.imageToken||0)+1;if(!url){plate.visible=false;body.visible=true;return}new THREE.TextureLoader().load(url,t=>{if(av.imageToken!==token){t.dispose();return}if(plate.material.map)plate.material.map.dispose();t.encoding=THREE.sRGBEncoding;plate.material.map=t;plate.material.needsUpdate=true;const a=t.image.width/t.image.height;plate.scale.set(a>1?1:a,a>1?1/a:1,1);plate.visible=true;body.visible=false})},
+  setImage(url){const token=av.imageToken=(av.imageToken||0)+1;if(!url){plate.visible=false;body.visible=true;return}new THREE.TextureLoader().load(url,t=>{if(av.imageToken!==token){t.dispose();return}if(plate.material.map)plate.material.map.dispose();t.encoding=THREE.sRGBEncoding;plate.material.map=t;plate.material.needsUpdate=true;const a=t.image.width/t.image.height;plate.scale.set(a,1,1);plate.visible=true;body.visible=false})},
   say(t){if(!av.bl){av.bl=label(t,{h:.5,bg:'rgba(255,255,255,.92)',fg:'#0e1621'});av.bl.position.y=2.95;g.add(av.bl)}else setLabel(av.bl,t);av.bl.visible=true;clearTimeout(av._t);av._t=setTimeout(()=>av.bl.visible=false,4500)},
   dispose(){av.modelToken=(av.modelToken||0)+1;W.onAvatarDispose&&W.onAvatarDispose(av);AVS.delete(av);clearTimeout(av._t);S.remove(g);g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&o.material.map){o.material.map.dispose();o.material.dispose()}})}};
- AVS.add(av);S.add(g);return av;
+ const visualBounds=new THREE.Box3().setFromObject(body);const visualHeight=visualBounds.max.y-visualBounds.min.y;body.scale.setScalar(1.8/visualHeight);body.position.y=-visualBounds.min.y*(1.8/visualHeight);av.baseBodyY=body.position.y;AVS.add(av);S.add(g);return av;
 }
 const meAv=makeAvatar('ゲスト');meAv.nameTag.visible=false;
 // Batch static box geometry per floor/material. Doors and avatars keep their own meshes.
@@ -256,6 +256,8 @@ const cameraSlabs=BD.flatMap(b=>Array.from({length:b.fl},(_,i)=>({x0:b.x-HALF-.5
 const cameraBoxCache=new WeakMap();function cameraBoxes(){const boxes=[];for(const c of COL){if(!c.on||c.x1<me.x-19||c.x0>me.x+19||c.z1<me.z-19||c.z0>me.z+19)continue;let box=cameraBoxCache.get(c);if(!box){box={x0:c.x0,x1:c.x1,z0:c.z0,z1:c.z1,y0:(c.f-1)*FH+c.y0,y1:(c.f-1)*FH+c.y1};cameraBoxCache.set(c,box)}boxes.push(box)}if(!W.customWorld)boxes.push(...cameraSlabs);if(inB&&!W.customWorld){const r=ROOMS.find(r=>r.zone===me.zone);if(r)boxes.push({x0:r.x0,x1:r.x1,z0:r.z0,z1:r.z1,y0:(me.f-1)*FH+4.6,y1:(me.f-1)*FH+4.68})}return boxes}
 
 function zoneAt(){if(W.customWorld)return W.customWorld;if(!inB)return'out';const r=ROOMS.find(r=>r.b===inB&&r.f===me.f&&me.x>r.x0&&me.x<r.x1&&me.z>r.z0&&me.z<r.z1);return r?r.zone:inB.id+me.f}
+function walkAxis(nx,nz){const oldY=me.y,worldY=(me.f-1)*FH+me.y;if(me.grounded&&me.vy<=0){const support=W.walkHeight?.(nx,nz,worldY);if(Number.isFinite(support))me.y=support-(me.f-1)*FH}if(moveOK(nx,nz,me.x,me.z,me.f)){me.x=nx;me.z=nz}else me.y=oldY}
+W.walkTo=(x,z)=>walkAxis(x,z);
 const clk=new THREE.Clock();
 function tick(){
  requestAnimationFrame(tick);
@@ -264,14 +266,14 @@ function tick(){
  const l=Math.hypot(ix,iy);if(l>1){ix/=l;iy/=l}
  if(!$('gate').hidden&&!W.prefs?.reduced)yaw+=dt*.07;
  if(l>.08){if(me.sit)me.y+=.49;me.sit=false;const y=mode3d?yaw:0,sn=Math.sin(y),cs=Math.cos(y),sp=(sprinting?10:6)*dt,dx=(ix*cs-iy*sn)*sp,dz=(-ix*sn-iy*cs)*sp;
-  const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.15));for(let i=0;i<steps;i++){if(moveOK(me.x+dx/steps,me.z,me.x,me.z,me.f))me.x+=dx/steps;if(moveOK(me.x,me.z+dz/steps,me.x,me.z,me.f))me.z+=dz/steps;}me.ry=Math.atan2(dx,dz)}
- const nb=W.customWorld?null:BD.find(b=>Math.abs(me.x-b.x)<HALF+.3&&Math.abs(me.z-b.z)<HALF+.3)||null;if(!nb&&me.f!==1)me.f=1;inB=nb;
- me.vx=(me.x-startX)/Math.max(dt,.001);me.vz=(me.z-startZ)/Math.max(dt,.001);const floorBase=inB?.16:0;if(me.y<floorBase){me.y=floorBase;me.vy=Math.max(0,me.vy)}const nearby=nearColliders(me.x,me.z,me.f),surfaces=[floorBase,...nearby.filter(c=>c.on&&c.f===me.f&&c.standable&&ov(c,me.x,me.z)).map(c=>c.y1)];const ceilingLimit=Math.min(inB?FH-1.9:Infinity,...nearby.filter(c=>c.on&&c.f===me.f&&c.y0>me.y+1.7&&ov(c,me.x,me.z)).map(c=>c.y0-1.8));if(!me.sit)CC_MOTION.vertical(me,dt,surfaces,ceilingLimit);
+  const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.15));for(let i=0;i<steps;i++){walkAxis(me.x+dx/steps,me.z);walkAxis(me.x,me.z+dz/steps);}me.ry=Math.atan2(dx,dz)}
+ const nb=W.customWorld?null:BD.find(b=>Math.abs(me.x-b.x)<HALF+.3&&Math.abs(me.z-b.z)<HALF+.3)||null;const worldFeet=(me.f-1)*FH+me.y;if(!nb){me.f=1;me.y=worldFeet}else if(nb!==inB){me.f=Math.max(1,Math.min(nb.fl,Math.floor((worldFeet+.25)/FH)+1));me.y=worldFeet-(me.f-1)*FH}inB=nb;
+ me.vx=(me.x-startX)/Math.max(dt,.001);me.vz=(me.z-startZ)/Math.max(dt,.001);const floorBase=inB?.16:0;if(me.y<floorBase){me.y=floorBase;me.vy=Math.max(0,me.vy)}const nearby=nearColliders(me.x,me.z,me.f),surfaces=[floorBase,...(W.walkSurfaces?.(me.x,me.z)||[]).map(y=>y-(me.f-1)*FH),...nearby.filter(c=>c.on&&c.f===me.f&&c.standable&&ov(c,me.x,me.z)).map(c=>c.y1)];const ceilingLimit=Math.min(inB?FH-1.9:Infinity,...nearby.filter(c=>c.on&&c.f===me.f&&c.y0>me.y+1.7&&ov(c,me.x,me.z)).map(c=>c.y0-1.8));if(!me.sit)CC_MOTION.vertical(me,dt,surfaces,ceilingLimit);
  const vk=(inB?inB.id:'')+me.f;if(vk!==visKey){visKey=vk;applyVis()}
  const zn=zoneAt();if(zn!==zone){zone=zn;me.zone=zn;$('locn').textContent=zn==='out'?(Math.hypot(me.x,me.z)<21?'中央庭園':'通り'):(W.customWorld?W.customWorldName:ZN[zn]||zn);W.onZone&&W.onZone(zn)}
  else if(zn==='out'){const t=Math.hypot(me.x,me.z)<21?'中央庭園':'通り';if($('locn').textContent!==t)$('locn').textContent=t}
  me.zone=zone;
- const py=(me.f-1)*FH+me.y;meAv.g.position.set(me.x,py,me.z);meAv.g.scale.setScalar(W.prefs?.height||1);meAv.body.rotation.y=me.ry;meAv.body.position.y=me.sit?-.32:0;meAv.sitting=me.sit;meAv.airborne=!me.grounded;
+ const py=(me.f-1)*FH+me.y;meAv.g.position.set(me.x,py,me.z);meAv.g.scale.setScalar(W.prefs?.height||1);meAv.body.rotation.y=me.ry;meAv.body.position.y=(meAv.baseBodyY||0)+(me.sit?-.32:0);meAv.sitting=me.sit;meAv.airborne=!me.grounded;
  const speed=Math.hypot(me.vx,me.vz);bobPhase+=Math.min(speed,10)*dt*1.7;const bob=CC_MOTION.walkBob(bobPhase,speed,me.grounded&&!me.sit,mode3d&&!typing&&W.prefs?.headBob!==false&&!W.prefs?.reduced),blend=1-Math.exp(-dt*12);bobX+=(bob.x-bobX)*blend;bobY+=(bob.y-bobY)*blend;bobRoll+=(bob.roll-bobRoll)*blend;
  if(mode3d){cam=persp;cam.up.set(0,1,0);
   if(W.prefs?.camera==='first'){cam.position.set(me.x+Math.cos(yaw)*bobX,py+1.65*(W.prefs?.height||1)+bobY,me.z-Math.sin(yaw)*bobX);cam.lookAt(cam.position.x-Math.sin(yaw)*Math.cos(firstPitch),cam.position.y-Math.sin(firstPitch),cam.position.z-Math.cos(yaw)*Math.cos(firstPitch))}

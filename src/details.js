@@ -70,7 +70,7 @@ for(const b of W.BD){b.wm.map=plaster.map;b.wm.normalMap=plaster.normalMap;b.wm.
    const buildingSign=sign(g,b.n,'THE COMMONS / '+b.id+' HOUSE',0,3.1,-14.43,3.6,.9,Math.PI);buildingSign.userData.buildingName=true;b.physicalName=buildingSign;
    sofa(g,8,-7,Math.PI/2,2.7,navy);table(g,6.3,-7,1.15,1.15,walnut);cup(g,6.3,.88,-7);plant(g,11.5,-11.5,1.25);plant(g,-11.5,3,1.1);
    sign(g,'WELCOME HOME','LOUNGE · WORK · PLAY',0,2.3,-2.64,1.65,.65,Math.PI);
-   for(let j=0;j<3;j++){if(b.id==='N'&&j===1)continue;const x=-8+j*8;sign(g,((window.CC_CONFIG||{}).tenants||[]).find(t=>t.building===b.id&&t.slot===j)?.name||'ATELIER '+(j+1),'OPEN FOR IDEAS',x,2.45,13.65,3,.7,Math.PI);for(let k=0;k<5;k++)box(g,x-1.6+k*.8,1.3,11.9,.35,.45+(k%2)*.25,.3,bookMats[k]);pendant(g,x,10.5,2.7)}
+   for(let j=0;j<3;j++){if(b.id==='N'&&j===1)continue;const x=-8+j*8;sign(g,((window.CC_CONFIG||{}).tenants||[]).find(t=>t.building===b.id&&t.slot===j)?.name||'ATELIER '+(b.id==='N'&&j===2?2:j+1),'OPEN FOR IDEAS',x,2.45,13.65,3,.7,Math.PI);for(let k=0;k<5;k++)box(g,x-1.6+k*.8,1.3,11.9,.35,.45+(k%2)*.25,.3,bookMats[k]);pendant(g,x,10.5,2.7)}
   }else{for(const side of [-1,1])for(const z of [-10,0,10])pendant(g,side*3.6,z,.8)}
  }
  const roof=group(b.G[b.fl+1],b.x,b.fl*FH,b.z,rotation,b.fl+1);for(const x of [-8,-3]){box(roof,x,.65,7,3,1.1,2,metal);for(let j=0;j<7;j++)box(roof,x,1.23,6.25+j*.25,2.7,.05,.06,dark)}

@@ -18,7 +18,7 @@ function emitChat(m,room=null){if(W.moderated?.chat>Date.now())return;const mid=
 $('cs').onclick=sendChat;$('ci').onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229&&!e.repeat){e.preventDefault();sendChat()}};
 msg('','ようこそ、'+st.name+' さん','sys');
 /* ---- network: serverless mesh over PeerJS public broker, rooms namespaced by a key only members can derive ---- */
-const VERSION='3.0.0',NS='cclass-'+W.roomKey+'-v'+VERSION.replaceAll('.','_'),MAXS=16,peers=new Map();
+const VERSION='3.1.0',NS='cclass-'+W.roomKey+'-v'+VERSION.replaceAll('.','_'),MAXS=16,peers=new Map();
 const netRetry=new W.networkTools.Retry(2000,60000),seenChats=new W.networkTools.Seen(),pending=new Map(),linked=new WeakSet();let brokerReady=false,peerGeneration=0,netStopped=false,reconnectTimer=null,reconnectFailures=0;
 let micPipeline=null,micGeneration=0;let micPending=false;let peer=null,mySlot=-1,stream=null,ctx=null,scanT=null;
 const PO=Object.assign({},CFG.peer||{});if(CFG.ice)PO.config={iceServers:CFG.ice};
@@ -35,7 +35,7 @@ function startPeer(s){
  const generation=++peerGeneration,pr=new Peer(NS+'-'+s,PO);peer=pr;brokerReady=false;
  pr.on('open',()=>{if(generation!==peerGeneration||netStopped){pr.destroy();return}peer=pr;mySlot=s;brokerReady=true;networkIssue='';reconnectFailures=0;clearTimeout(reconnectTimer);reconnectTimer=null;setNet('ok');scan();clearInterval(scanT);scanT=setInterval(maintainNetwork,200)});
  pr.on('error',e=>{if(generation!==peerGeneration||netStopped)return;
-  if(e.type==='peer-unavailable'){const message=String(e.message||'');for(const [id,state] of pending)if(message.includes(id))clearPending(id,state.conn);return}
+  if(e.type==='peer-unavailable'){const message=String(e.message||'');for(const [id,state] of pending)if(new RegExp('(?:^|[\"\\s])'+id+'(?:$|[\"\\s.])').test(message))clearPending(id,state.conn);return}
   if(e.type==='webrtc'){networkIssue='相手との通信を再試行しています';return}
   if(e.type==='unavailable-id'){peerGeneration++;try{pr.destroy()}catch(_){}if(s+1<MAXS)setTimeout(()=>startPeer(s+1),100);else{networkIssue='接続枠が埋まっています';setNet('full')}return}
   networkIssue='接続仲介: '+String(e.type||'network');brokerReady=false;setNet('wait');retryBroker();
@@ -45,31 +45,44 @@ function startPeer(s){
  pr.on('disconnected',()=>{if(generation!==peerGeneration||netStopped)return;brokerReady=false;setNet('wait');retryBroker()});
  pr.on('close',()=>{if(generation!==peerGeneration||netStopped)return;brokerReady=false;setNet('wait');retryBroker()});
 }
-function scan(){if(!peer||peer.destroyed||!brokerReady||peer.disconnected||pending.size>=6)return;for(let s=mySlot+1;s<MAXS&&pending.size<6;s++){const id=NS+'-'+s;if(!peers.has(id)&&!pending.has(id)&&netRetry.ready(id,performance.now())){try{link(peer.connect(id,{reliable:true,serialization:'binary'}))}catch(_){netRetry.fail(id,performance.now())}}}}
+function scan(){if(!peer||peer.destroyed||!brokerReady||peer.disconnected||pending.size>=6)return;for(let s=mySlot+1;s<MAXS&&pending.size<6;s++){const id=NS+'-'+s;if((!peers.has(id)||peers.get(id).conn.relay)&&!pending.has(id)&&netRetry.ready(id,performance.now())){try{link(peer.connect(id,{reliable:true,serialization:'binary'}))}catch(_){netRetry.fail(id,performance.now())}}}}
 function link(c){
  if(!c||linked.has(c))return;linked.add(c);const id=c.peer;
  if(!new RegExp('^'+NS+'-(?:[0-9]|1[0-5])$').test(id)){try{c.close()}catch(_){}return}
- const ex=peers.get(id),waiting=pending.get(id);if(ex?.conn.open&&ex.conn!==c||waiting&&waiting.conn!==c){try{c.close()}catch(_){}return}
- let activated=false;const timer=setTimeout(()=>clearPending(id,c),12000);pending.set(id,{conn:c,timer});
- const open=()=>{if(activated||netStopped)return;activated=true;const existing=peers.get(id);if(existing?.conn.open&&existing.conn!==c){clearPending(id,c,false);c.close();return}clearTimeout(timer);if(pending.get(id)?.conn===c)pending.delete(id);netRetry.clear(id);
-  const p=existing||{pid:id,av:null,name:'?',x:0,z:0,f:1,zn:'out',ry:0,sit:false,first:true};p.conn=c;p.lastSeen=performance.now();p.lastPing=0;p.disconnectedAt=0;peers.set(id,p);c.send(hello());publishPosition(true);updPC();
+ const ex=peers.get(id),waiting=pending.get(id);if(ex?.conn.open&&!ex.conn.relay&&ex.conn!==c||waiting&&waiting.conn!==c&&!c.relay){try{c.close()}catch(_){}return}
+ let activated=false;const timer=c.relay?null:setTimeout(()=>clearPending(id,c),12000);if(!c.relay)pending.set(id,{conn:c,timer});
+ const open=()=>{if(activated||netStopped)return;activated=true;const existing=peers.get(id);if(existing?.conn.open&&!existing.conn.relay&&existing.conn!==c){clearPending(id,c,false);c.close();return}clearTimeout(timer);if(pending.get(id)?.conn===c)pending.delete(id);netRetry.clear(id);
+  const p=existing||{pid:id,av:null,name:'?',x:0,z:0,f:1,zn:'out',ry:0,sit:false,first:true};p.conn=c;p.lastSeen=performance.now();p.lastPing=0;p.disconnectedAt=0;p.hiAt=performance.now();p.hiAck=false;peers.set(id,p);c.send(hello());publishPosition(true);updPC();
  };
- c.on('open',open);c.on('data',d=>onData(id,c,d));c.on('close',()=>{clearPending(id,c);drop(id,c)});c.on('error',()=>{clearPending(id,c);drop(id,c);try{c.close()}catch(_){}});if(c.open)queueMicrotask(open);
+ c.on('open',open);c.on('data',d=>onData(id,c,d));c.on('close',()=>{clearPending(id,c);drop(id,c)});c.on('error',()=>{clearPending(id,c);drop(id,c);try{c.close()}catch(_){}});if(c.open)open();
 }
 function maintainNetwork(){if(netStopped)return;const now=performance.now();if(!brokerReady)retryBroker();scan();for(const p of peers.values()){
+ if(!p.hiAck&&now-p.hiAt>1500){p.hiAt=now;try{p.conn.send(hello())}catch(_){}}
  const state=p.conn.peerConnection?.connectionState;if(state==='failed'||state==='closed'){p.conn.close();drop(p.pid,p.conn);continue}
  if(state==='disconnected'){p.disconnectedAt=p.disconnectedAt||now;if(now-p.disconnectedAt>15000){p.conn.close();drop(p.pid,p.conn);continue}}else p.disconnectedAt=0;
  if(now-p.lastSeen>90000){p.conn.close();drop(p.pid,p.conn);continue}
  if(now-p.lastPing>5000&&p.conn.open){p.lastPing=now;try{p.conn.send({t:'ping',at:now})}catch(_){}}
  const outgoing=calls.get(p.pid);if(outgoing&&now-(p.voiceStarted||now)>20000&&outgoing.peerConnection?.connectionState!=='connected'){try{outgoing.close()}catch(_){}calls.delete(p.pid);p.voiceNext=now+3000}
  if(stream&&!calls.has(p.pid)&&now>=(p.voiceNext||0))callPeer(p);
- }publishPosition(false);}
-W.network={retry(){clearTimeout(reconnectTimer);reconnectTimer=null;reconnectFailures=0;netRetry.reset();if(peer&&!peer.destroyed){if(peer.disconnected)try{peer.reconnect()}catch(_){retryBroker()}else scan()}else startPeer(Math.max(0,mySlot))},get status(){return {brokerReady,pending:pending.size,connected:peers.size,issue:networkIssue}}};
+ }maintainMesh(now);publishPosition(false);}
+const meshRoutes=new Map();let lastRoster=0;const validPeer=id=>typeof id==='string'&&new RegExp('^'+NS+'-(?:[0-9]|1[0-5])$').test(id);
+function hubFor(id,except){const options=meshRoutes.get(id);if(!options)return null;for(const [hub,at] of options){const p=peers.get(hub);if(hub!==except&&performance.now()-at<12000&&p?.av&&p.conn.open&&!p.conn.relay)return p}return null}
+function relayConnection(id,hub){const handlers={};return {peer:id,open:true,relay:hub.pid,get dataChannel(){return hub.conn.dataChannel},get bufferSize(){return hub.conn.bufferSize||0},on(event,fn){(handlers[event]??=[]).push(fn)},send(packet){if(!hub.conn.open)throw Error('relay closed');hub.conn.send({t:'mesh-send',to:id,packet})},close(){if(!this.open)return;this.open=false;(handlers.close||[]).forEach(fn=>fn())}}}
+function adoptRelay(id,old){const hub=hubFor(id,old.relay);if(!hub)return false;const c=relayConnection(id,hub);link(c);return peers.get(id)?.conn===c}
+function handleMesh(id,c,d){if(!d.t.startsWith('mesh-'))return false;if(c.relay)return true;
+ if(d.t==='mesh-roster'&&Array.isArray(d.ids)){for(const remote of d.ids.slice(0,MAXS)){if(!validPeer(remote)||remote===peer.id||remote===id)continue;if(!meshRoutes.has(remote))meshRoutes.set(remote,new Map());meshRoutes.get(remote).set(id,performance.now());if(!peers.has(remote)){netRetry.clear(remote);link(relayConnection(remote,peers.get(id)))}}}
+ if(d.t==='mesh-send'&&validPeer(d.to)&&d.packet&&typeof d.packet.t==='string'&&!d.packet.t.startsWith('mesh-')){const target=peers.get(d.to);if(target?.av&&target.conn.open&&!target.conn.relay)try{target.conn.send({t:'mesh-deliver',from:id,packet:d.packet})}catch(_){}}
+ if(d.t==='mesh-deliver'&&validPeer(d.from)&&d.from!==peer.id&&d.packet&&typeof d.packet.t==='string'&&!d.packet.t.startsWith('mesh-')){let source=peers.get(d.from);if(!source){if(!meshRoutes.has(d.from))meshRoutes.set(d.from,new Map());meshRoutes.get(d.from).set(id,performance.now());link(relayConnection(d.from,peers.get(id)));source=peers.get(d.from)}if(source?.conn.relay===id)onData(d.from,source.conn,d.packet)}return true;
+}
+function maintainMesh(now){if(now-lastRoster>2000){lastRoster=now;const ids=[peer.id,...[...peers.values()].filter(p=>p.av&&p.conn.open&&!p.conn.relay).map(p=>p.pid)];for(const p of peers.values())if(p.av&&p.conn.open&&!p.conn.relay)try{p.conn.send({t:'mesh-roster',ids})}catch(_){}}
+ for(const p of peers.values())if(p.conn.relay&&!hubFor(p.pid)){p.conn.close()}else if(p.conn.relay&&now-(p.directRetry||0)>6000){p.directRetry=now;netRetry.clear(p.pid)}
+}
+W.network={retry(){clearTimeout(reconnectTimer);reconnectTimer=null;reconnectFailures=0;netRetry.reset();if(peer&&!peer.destroyed){if(peer.disconnected)try{peer.reconnect()}catch(_){retryBroker()}else scan()}else startPeer(Math.max(0,mySlot))},get status(){return {brokerReady,pending:pending.size,connected:peers.size,relayed:[...peers.values()].filter(p=>p.conn.relay).length,issue:networkIssue}}};
 function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!=='object'||typeof d.t!=='string')return;
- p.lastSeen=performance.now();if(d.t==='ping'){if(Number.isFinite(d.at))try{c.send({t:'pong',at:d.at})}catch(_){}return}if(d.t==='pong'){if(Number.isFinite(d.at))p.rtt=Math.max(0,performance.now()-d.at);return}
+ p.lastSeen=performance.now();if(handleMesh(id,c,d))return;if(d.t==='hello-ack'){p.hiAck=true;return}if(d.t==='ping'){if(Number.isFinite(d.at))try{c.send({t:'pong',at:d.at})}catch(_){}return}if(d.t==='pong'){if(Number.isFinite(d.at))p.rtt=Math.max(0,performance.now()-d.at);return}
  if(!p.rateAt||performance.now()-p.rateAt>1000){p.rateAt=performance.now();p.rate=0;p.fileRate=0}if(d.t==='file-chunk'){if(++p.fileRate>4096)return}else if(++p.rate>100)return;
  if(d.t==='hi'&&(typeof d.name!=='string'||d.name.length>32||typeof d.id!=='string'||!IDS.includes(d.id)))return;
- if(d.t==='hi'&&d.version!==VERSION){c.close();W.toast('相手とバージョンが異なります。再読み込みしてください');return}if(d.t==='hi'){const first=!p.av;p.name=d.name;p.id=d.id;receiveRestrictions(p.id,d.noEntry);p.minutes=Math.max(0,Math.min(100000,Number(d.minutes)||0));if(first){p.av=W.makeAvatar(d.name,d.col);p.av.g.position.set(p.x,0,p.z)}else{p.av.setName(d.name);p.av.setColor(d.col)}
+ if(d.t==='hi'&&d.version!==VERSION){c.close();W.toast('相手とバージョンが異なります。再読み込みしてください');return}if(d.t==='hi'){try{c.send({t:'hello-ack'})}catch(_){}const first=!p.av;p.name=d.name;p.id=d.id;receiveRestrictions(p.id,d.noEntry);p.minutes=Math.max(0,Math.min(100000,Number(d.minutes)||0));if(first){p.av=W.makeAvatar(d.name,d.col);p.av.g.position.set(p.x,0,p.z)}else{p.av.setName(d.name);p.av.setColor(d.col)}
   if(typeof d.av==='string'&&d.av.length<250000&&(!d.av||/^data:image\/(webp|png|jpeg);base64,/.test(d.av))&&p.avUrl!==d.av){p.avUrl=d.av;p.av.setImage(d.av||'')}
   if(Array.isArray(d.dr))d.dr.slice(0,100).forEach(z=>{const r=W.doors[z]?.room;if(r&&(r.k!=='private'||IDS[r.own]===p.id))W.setDoor(z,true,true)});if(typeof d.glb==='string'&&d.glb.length<2048&&W.setAvatarModel&&p.glb!==d.glb){p.glb=d.glb;W.setAvatarModel(p.av,d.glb)}
   p.av.g.visible=!policy(p).hideAvatar&&(p.world||'')===(W.customWorld||'');if(first){msg('',d.name+' が参加しました','sys',p.id);if(stream)callPeer(p);updPC()}}
@@ -79,7 +92,7 @@ function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!==
   if(d.y!==undefined&&(!Number.isFinite(d.y)||d.y<0||d.y>32))return;
   if(['vx','vz','vy','q','tm'].some(k=>d[k]!==undefined&&!Number.isFinite(d[k])))return;
   p.motion=p.motion||W.motion.remote();if(!W.motion.push(p.motion,d,performance.now()))return;
-  p.height=Math.max(.3,Math.min(2,Number(d.height)||1));p.av.g.scale.setScalar(p.height);p.mic=!!d.mic;p.deaf=!!d.deaf;p.av.setName(p.name+(p.mic?'':' 🔇')+(p.deaf?' 🔈OFF':''));p.world=typeof d.world==='string'?d.world.slice(0,80):'';p.tx=d.x;p.tz=d.z;p.f=d.f;p.zn=d.zn;p.ry=d.ry;p.sit=!!d.s;
+  p.height=Math.max(.3,Math.min(2,Number(d.height)||1));p.av.g.scale.setScalar(p.height);p.mic=!!d.mic;p.deaf=!!d.deaf;const display=p.name+(p.mic?'':' 🔇')+(p.deaf?' 🔈OFF':'');if(p.av.name!==display)p.av.setName(display);p.world=typeof d.world==='string'?d.world.slice(0,80):'';p.tx=d.x;p.tz=d.z;p.f=d.f;p.zn=d.zn;p.ry=d.ry;p.sit=!!d.s;
   if(p.first||p.motion.teleported){p.first=false;p.av.g.position.set(d.x,(d.f-1)*FH+(d.y||0),d.z);p.av.body.rotation.y=d.ry;p.motion.teleported=false}
  }
  else if(d.t==='c'){if(policy(p).chat==='none')return;if(typeof d.m!=='string'||d.m.length>200||d.room&&(d.room!==W.me.zone||p.zn!==d.room))return;if(d.mid!==undefined&&(typeof d.mid!=='string'||d.mid.length>100))return;const stamp=performance.now(),identity=p.id+'|'+(d.mid||('legacy|'+(d.room||'')+'|'+d.m));if(!seenChats.accept(identity,stamp,d.mid?300000:1200))return;msg(p.name+(d.room?' · この部屋':''),d.m,'',p.id);if(policy(p).chat==='all')p.av.say(d.m.slice(0,60));W.sfx?.play('notify','world');if(!chat.classList.contains('open')){unread++;$('unread').textContent=unread>9?'9+':unread;$('unread').hidden=false}}
@@ -87,7 +100,7 @@ function onData(id,c,d){const p=peers.get(id);if(!p||p.conn!==c||!d||typeof d!==
  else if(d.t==='dr'){const target=W.doors[d.z]?.room;if(!target||target.k==='private'&&IDS[target.own]!==p.id)return;W.setDoor(d.z,!!d.c,true);const r=W.doors[d.z]&&W.doors[d.z].room;if(r)msg('',p.name+' が'+r.n+'のドアを'+(d.c?'閉めました':'開けました'),'sys',p.id)}
  else if(!(d.t==='file-offer'&&policy(p).chat==='none'))memberHandlers.forEach(fn=>fn(p,d));
 }
-function drop(id,c){const p=peers.get(id);if(!p||p.conn!==c)return;peers.delete(id);netRetry.fail(id,performance.now());if(p.av){p.av.dispose();msg('',p.name+' が退出しました','sys',p.id)}voiceOut(id);const incoming=incomingCalls.get(id);if(incoming){incomingCalls.delete(id);try{incoming.close()}catch(_){}}const cl=calls.get(id);if(cl){try{cl.close()}catch(e){}calls.delete(id)}updPC()}
+function drop(id,c){const p=peers.get(id);if(!p||p.conn!==c)return;if(!netStopped&&adoptRelay(id,c))return;peers.delete(id);netRetry.fail(id,performance.now());if(p.av){p.av.dispose();msg('',p.name+' が退出しました','sys',p.id)}voiceOut(id);const incoming=incomingCalls.get(id);if(incoming){incomingCalls.delete(id);try{incoming.close()}catch(_){}}const cl=calls.get(id);if(cl){try{cl.close()}catch(e){}calls.delete(id)}updPC()}
 /* ---- voice ---- */
 @@VOICE@@
 const calls=new Map(),vc=new Map(),incomingCalls=new Map();
@@ -121,7 +134,7 @@ W.onTick.push(dt=>{acc+=dt;if(acc>=.1){acc=0;publishPosition()}
  peers.forEach(p=>{if(!p.av||p.first||!p.motion)return;p.av.g.visible=!policy(p).hideAvatar&&(p.world||'')===(W.customWorld||'');
   const pose=W.motion.sample(p.motion,performance.now());if(!pose)return;const g=p.av.g.position;
   g.x+=(pose.x-g.x)*k;g.z+=(pose.z-g.z)*k;g.y+=((pose.f-1)*FH+pose.y-g.y)*k;
-  p.av.body.rotation.y=W.motion.angle(p.av.body.rotation.y,pose.ry,k);p.av.body.position.y=pose.s?-.32:0;p.av.sitting=!!pose.s;p.av.airborne=Math.abs(pose.vy||0)>.2;p.stale=pose.stale;
+  p.av.body.rotation.y=W.motion.angle(p.av.body.rotation.y,pose.ry,k);p.av.body.position.y=(p.av.baseBodyY||0)+(pose.s?-.32:0);p.av.sitting=!!pose.s;p.av.airborne=Math.abs(pose.vy||0)>.2;p.stale=pose.stale;
  });
 });
 

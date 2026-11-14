@@ -149,3 +149,12 @@ RNNoiseのラッパーは@sapphi-red/web-noise-suppressor 0.4.1。distのESM、w
 家具のインスタンス化は部屋/建築グループ単位。部屋の家具だけをLOD対象にして壁の不透明性を維持します。COLは8mの階別グリッドに登録し、追加/削除で再構築、ドアのonは照会時に評価。カメラ用AABBはキャッシュし、最大カメラ距離に接する範囲だけを照会します。
 
 2026-11-05の実ブラウザー回帰検証では、同一庭園視点でhighが161,354三角形/394 draw calls、lowが119,608三角形/309 draw calls。描画形状約26%、呼出し約22%減。SwiftShaderでの比較であり、実PCのFPS改善率を示す値ではありません。仲介の切断後の復帰、RTC切断後の再接続、復帰後チャットと重複排除も検証しました。
+
+
+## 3.1の追加モジュール
+
+traversal.jsは歩ける階段の支持面、コース、HUD、完走結果、公開のゲート形状を生成。W.walkSurfaces()/walkHeight()をworld.jsの移動/垂直計算から呼びます。W.traversalは診断と検証用。座標移動はW.walkTo()でも同じ判定を通ります。
+
+editor.jsのW.attachEditor()は既存draftの参照を共有し、選択indexを通知。数値編集とプレビューを同じデータで同期します。portals.jsはアカウント別の保存と公開ゲートのラベルを結びつけます。
+
+member.jsのmesh-roster / mesh-send / mesh-deliverはデータの一段中継。virtual DataConnectionはrelayに中継者IDを保持します。物理接続のpendingは仮想接続とは別に残し、直接接続への昇格ができます。12秒の経路有効期間と既存のend-to-end Pingを使い、中継者が退室した場合も別経路を探索します。詳しい制限はUPDATE-3.1.mdを参照してください。
